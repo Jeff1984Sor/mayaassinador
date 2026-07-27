@@ -3,6 +3,7 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 
 from app.api.deps import DbSession, TenantAtual, UsuarioAtual
@@ -17,6 +18,7 @@ from app.schemas.configuracao import (
     FonteOut,
     UploadOut,
 )
+from app.services import conversao, pdf_teste
 from app.services import email as servico_email
 from app.services import imagens
 from app.services.templates_email import email_teste
@@ -138,6 +140,33 @@ def remover_imagem(
     remover(f"{tenant.slug}/config/{tipo}_original.png")
     setattr(obj, f"{tipo}_path", None)
     db.commit()
+
+
+@router.post("/pdf-teste")
+def gerar_pdf_teste(
+    tenant: TenantAtual, db: DbSession, _: UsuarioAtual
+) -> FileResponse:
+    """Roda o pipeline real sobre uma peticao de exemplo.
+
+    E a prova final de que o preview da tela e o PDF gerado batem: mesma
+    montagem de cabecalho, mesma tipografia, mesmo LibreOffice.
+    """
+    config = _buscar(db, tenant.id)
+    escritorio = db.scalar(select(Escritorio).where(Escritorio.tenant_id == tenant.id))
+
+    try:
+        caminho = pdf_teste.gerar(config, escritorio, tenant.slug)
+    except conversao.FalhaConversao as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            f"Falha ao gerar o PDF de teste: {exc}",
+        ) from exc
+
+    return FileResponse(
+        caminho, media_type="application/pdf", filename="mayaassinador-teste.pdf"
+    )
 
 
 @router.post("/email-teste", status_code=status.HTTP_200_OK)

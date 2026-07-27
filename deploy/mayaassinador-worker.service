@@ -1,0 +1,29 @@
+[Unit]
+Description=MayaAssinador Worker (pipeline de documentos — fila no Postgres)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/mayaassinador/backend
+EnvironmentFile=/home/deploy/mayaassinador/backend/.env
+ExecStart=/home/deploy/mayaassinador/backend/.venv/bin/python -m app.worker
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mayaassinador-worker
+
+# HOME e obrigatorio: sem ele o LibreOffice headless aborta ao tentar
+# escrever o profile (foi exatamente o erro visto na F0 rodando de /root).
+Environment=HOME=/home/deploy
+Environment=PYTHONUNBUFFERED=1
+
+# encerra com calma: o worker termina o documento atual ao receber SIGTERM
+KillSignal=SIGTERM
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target

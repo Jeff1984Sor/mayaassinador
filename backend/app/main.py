@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api.routes import arquivos, auth, configuracao, escritorio
+from app.api.routes import arquivos, auth, configuracao, documentos, escritorio
 from app.core.config import settings
 from app.db.session import engine
 
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(escritorio.router, prefix="/api")
 app.include_router(configuracao.router, prefix="/api")
+app.include_router(documentos.router, prefix="/api")
 app.include_router(arquivos.router, prefix="/api")
 
 
