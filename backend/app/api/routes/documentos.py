@@ -4,20 +4,23 @@ O CRUD completo (busca, filtros, downloads, reprocessar, soft delete) chega
 na F4. Aqui esta o que a F3 precisa: subir o .docx, enfileirar e acompanhar.
 """
 
-from typing import Annotated
+from datetime import date, datetime, time, timezone
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import DbSession, TenantAtual, UsuarioAtual
+from app.api.deps import DbSession, TenantAtual, TenantFlex, UsuarioAtual
 from app.core.config import settings
-from app.core.storage import dir_documento, para_relativo
+from app.core.storage import caminho_absoluto, dir_documento, para_relativo
 from app.models import ConfiguracaoTenant, Documento, StatusDocumento, TipoEvento
 from app.schemas.documento import (
     DocumentoDetalhe,
     DocumentoOut,
     ListaDocumentos,
+    RenomearRequest,
     ResumoDocumentos,
 )
 from app.services.pipeline import registrar_evento
@@ -100,10 +103,24 @@ def listar(
     _: UsuarioAtual,
     pagina: Annotated[int, Query(ge=1)] = 1,
     por_pagina: Annotated[int, Query(ge=1, le=100)] = 20,
+    busca: Annotated[str | None, Query(description="Trecho do nome do arquivo")] = None,
+    status_: Annotated[StatusDocumento | None, Query(alias="status")] = None,
+    de: Annotated[date | None, Query(description="Data inicial (inclusive)")] = None,
+    ate: Annotated[date | None, Query(description="Data final (inclusive)")] = None,
 ) -> ListaDocumentos:
     base = select(Documento).where(
         Documento.tenant_id == tenant.id, Documento.deleted_at.is_(None)
     )
+
+    if busca:
+        base = base.where(Documento.nome_original.ilike(f"%{busca.strip()}%"))
+    if status_:
+        base = base.where(Documento.status == status_)
+    if de:
+        base = base.where(Documento.criado_em >= datetime.combine(de, time.min))
+    if ate:
+        # ate o fim do dia — senao "ate hoje" excluiria tudo de hoje
+        base = base.where(Documento.criado_em <= datetime.combine(ate, time.max))
 
     total = db.scalar(
         select(func.count()).select_from(base.subquery())
@@ -160,3 +177,138 @@ def obter(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento nao encontrado")
 
     return DocumentoDetalhe.model_validate(documento)
+
+
+def _buscar(db: DbSession, tenant_id: int, documento_id: int) -> Documento:
+    documento = db.scalar(
+        select(Documento).where(
+            Documento.id == documento_id,
+            Documento.tenant_id == tenant_id,
+            Documento.deleted_at.is_(None),
+        )
+    )
+    if documento is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento nao encontrado")
+    return documento
+
+
+@router.get("/{documento_id}/arquivo/{tipo}")
+def baixar(
+    documento_id: int,
+    tipo: Literal["final", "original"],
+    tenant: TenantFlex,
+    db: DbSession,
+    inline: Annotated[bool, Query(description="Exibir no navegador")] = False,
+) -> FileResponse:
+    """Download do PDF final ou do .docx original.
+
+    Usa TenantFlex porque o preview inline roda dentro de um <iframe>, que
+    nao envia header Authorization.
+    """
+    documento = _buscar(db, tenant.id, documento_id)
+
+    if tipo == "final":
+        relativo = documento.caminho_final
+        if not relativo:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "O PDF final ainda nao foi gerado para este documento",
+            )
+        midia = "application/pdf"
+        nome = f"{documento.nome_original.rsplit('.', 1)[0]}.pdf"
+    else:
+        relativo = documento.caminho_original
+        if not relativo:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo original ausente")
+        midia = MIME_DOCX
+        nome = documento.nome_original
+
+    caminho = caminho_absoluto(relativo)
+    if not caminho.exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo nao encontrado no storage")
+
+    if not inline:
+        registrar_evento(db, documento.id, TipoEvento.DOWNLOAD, tipo)
+        db.commit()
+
+    return FileResponse(
+        caminho,
+        media_type=midia,
+        # inline abre no visualizador do navegador; attachment forca download
+        headers={
+            "Content-Disposition": f'{"inline" if inline else "attachment"}; filename="{nome}"'
+        },
+    )
+
+
+@router.post("/{documento_id}/reprocessar", response_model=DocumentoOut)
+def reprocessar(
+    documento_id: int, tenant: TenantAtual, db: DbSession, _: UsuarioAtual
+) -> DocumentoOut:
+    """Devolve o documento para a fila.
+
+    Util depois de mudar cabecalho, rodape ou assinatura: o original esta
+    intacto no storage, entao o pipeline roda de novo do zero.
+    """
+    documento = _buscar(db, tenant.id, documento_id)
+
+    if documento.status in (StatusDocumento.ENVIADO, StatusDocumento.PROCESSANDO):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "O documento ja esta na fila de processamento"
+        )
+    if not documento.caminho_original:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Documento sem arquivo original para reprocessar"
+        )
+
+    documento.status = StatusDocumento.ENVIADO
+    documento.tentativas = 0  # nova ordem: o contador de falhas recomeca
+    documento.erro_msg = None
+    documento.processando_desde = None
+    documento.processado_em = None
+
+    registrar_evento(db, documento.id, TipoEvento.REPROCESSADO)
+    db.commit()
+    db.refresh(documento)
+
+    return DocumentoOut.model_validate(documento)
+
+
+@router.patch("/{documento_id}", response_model=DocumentoOut)
+def renomear(
+    documento_id: int,
+    dados: RenomearRequest,
+    tenant: TenantAtual,
+    db: DbSession,
+    _: UsuarioAtual,
+) -> DocumentoOut:
+    """Renomeia o documento na listagem.
+
+    Muda apenas o rotulo no banco — o arquivo no storage continua sendo o
+    que o cliente enviou, com o mesmo hash.
+    """
+    documento = _buscar(db, tenant.id, documento_id)
+    nome = dados.nome_original.strip()
+    if not nome.lower().endswith(EXTENSAO):
+        nome = f"{nome}{EXTENSAO}"
+
+    documento.nome_original = nome
+    db.commit()
+    db.refresh(documento)
+
+    return DocumentoOut.model_validate(documento)
+
+
+@router.delete("/{documento_id}", status_code=status.HTTP_204_NO_CONTENT)
+def excluir(
+    documento_id: int, tenant: TenantAtual, db: DbSession, _: UsuarioAtual
+) -> None:
+    """Soft delete.
+
+    Os arquivos permanecem no storage: o anexo original do cliente e
+    sagrado e a trilha de auditoria precisa continuar verificavel.
+    """
+    documento = _buscar(db, tenant.id, documento_id)
+    documento.deleted_at = datetime.now(timezone.utc)
+    registrar_evento(db, documento.id, TipoEvento.EXCLUIDO)
+    db.commit()

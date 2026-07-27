@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.documento import StatusDocumento
 from app.models.evento import TipoEvento
@@ -42,6 +42,10 @@ class ListaDocumentos(BaseModel):
     total: int
     pagina: int
     paginas: int
+
+
+class RenomearRequest(BaseModel):
+    nome_original: str = Field(min_length=1, max_length=480)
 
 
 class ResumoDocumentos(BaseModel):
