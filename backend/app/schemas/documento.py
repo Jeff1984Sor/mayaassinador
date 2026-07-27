@@ -2,9 +2,10 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.documento import StatusDocumento
+from app.models.envio_email import StatusEnvio
 from app.models.evento import TipoEvento
 
 
@@ -35,6 +36,7 @@ class EventoOut(BaseModel):
 
 class DocumentoDetalhe(DocumentoOut):
     eventos: list[EventoOut] = []
+    envios: list["EnvioOut"] = []
 
 
 class ListaDocumentos(BaseModel):
@@ -42,6 +44,36 @@ class ListaDocumentos(BaseModel):
     total: int
     pagina: int
     paginas: int
+
+
+class EnvioOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    destinatarios: list[str]
+    assunto: str
+    status: StatusEnvio
+    erro_msg: str | None
+    enviado_em: datetime | None
+    criado_em: datetime
+
+
+class EnviarEmailRequest(BaseModel):
+    destinatarios: list[EmailStr] = Field(min_length=1, max_length=20)
+    assunto: str = Field(min_length=1, max_length=255)
+    mensagem: str = Field(default="", max_length=5000)
+    remetente_nome: str | None = Field(default=None, max_length=200)
+    remetente_email: EmailStr | None = None
+
+
+class PadraoEmail(BaseModel):
+    """Valores que a tela usa para pre-preencher o modal de envio."""
+
+    assunto: str
+    mensagem: str
+    remetente_nome: str
+    remetente_email: str
+    smtp_configurado: bool
 
 
 class RenomearRequest(BaseModel):

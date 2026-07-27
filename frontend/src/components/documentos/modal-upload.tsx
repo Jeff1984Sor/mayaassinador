@@ -109,7 +109,7 @@ export function ModalUpload({
             <h2 className="text-base font-semibold text-dark">
               {processando ? "Processando documento" : "Novo documento"}
             </h2>
-            <p className="mt-0.5 text-xs text-dark/50">
+            <p className="mt-0.5 text-xs text-dark/70">
               {processando
                 ? arquivo?.name
                 : "Envie um .docx e receba o PDF timbrado e assinado"}
@@ -118,7 +118,7 @@ export function ModalUpload({
           {(!processando || finalizado) && (
             <button
               onClick={aoFechar}
-              className="rounded-lg p-1 text-dark/35 transition hover:bg-cinza hover:text-dark/70"
+              className="rounded-lg p-1 text-dark/55 transition hover:bg-cinza hover:text-dark/88"
             >
               <X className="h-4.5 w-4.5" />
             </button>
@@ -153,7 +153,7 @@ export function ModalUpload({
                   <>
                     <FileText className="mb-2 h-8 w-8 text-teal" />
                     <p className="text-sm font-medium text-dark">{arquivo.name}</p>
-                    <p className="mt-0.5 text-xs text-dark/45">
+                    <p className="mt-0.5 text-xs text-dark/65">
                       {formatarTamanho(arquivo.size)} · clique para trocar
                     </p>
                   </>
@@ -163,7 +163,7 @@ export function ModalUpload({
                     <p className="text-sm font-medium text-dark">
                       Arraste o arquivo aqui
                     </p>
-                    <p className="mt-0.5 text-xs text-dark/45">
+                    <p className="mt-0.5 text-xs text-dark/65">
                       ou clique para escolher · .docx ate {MAX_MB}MB
                     </p>
                   </>
@@ -186,10 +186,10 @@ export function ModalUpload({
                   className="mt-0.5 h-4 w-4 accent-navy"
                 />
                 <span>
-                  <span className="text-sm text-dark/85">
+                  <span className="text-sm text-dark/95">
                     Rubricar todas as paginas
                   </span>
-                  <span className="block text-xs text-dark/45">
+                  <span className="block text-xs text-dark/65">
                     Carimba a rubrica cadastrada no canto de cada pagina.
                   </span>
                 </span>
@@ -231,7 +231,7 @@ export function ModalUpload({
             <>
               <button
                 onClick={aoFechar}
-                className="rounded-lg px-4 py-2.5 text-sm text-dark/60 transition hover:bg-cinza"
+                className="rounded-lg px-4 py-2.5 text-sm text-dark/80 transition hover:bg-cinza"
               >
                 Cancelar
               </button>

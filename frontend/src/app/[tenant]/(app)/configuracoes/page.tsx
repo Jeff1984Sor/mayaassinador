@@ -219,7 +219,7 @@ export default function ConfiguracoesPage() {
           <h1 className="text-xl font-semibold tracking-tight text-dark">
             Configuracoes
           </h1>
-          <p className="mt-1 text-sm text-dark/55">
+          <p className="mt-1 text-sm text-dark/75">
             Cadastre uma vez — reflete no cabecalho, no rodape, no email e na
             pagina de verificacao.
           </p>
@@ -247,7 +247,7 @@ export default function ConfiguracoesPage() {
               "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm transition",
               aba === a.id
                 ? "border-navy font-medium text-navy"
-                : "border-transparent text-dark/50 hover:text-dark/75",
+                : "border-transparent text-dark/70 hover:text-dark/90",
             )}
           >
             {a.rotulo}
@@ -530,7 +530,7 @@ export default function ConfiguracoesPage() {
                           "rounded-lg border px-3 py-1.5 text-xs font-medium transition",
                           ativo
                             ? "border-navy bg-navy text-white"
-                            : "border-dark/12 text-dark/65 hover:border-navy/35 hover:bg-cinza",
+                            : "border-dark/12 text-dark/85 hover:border-navy/35 hover:bg-cinza",
                         )}
                       >
                         {p.nome}
@@ -587,7 +587,7 @@ export default function ConfiguracoesPage() {
                   value={senhaSmtp}
                   onChange={(e) => setSenhaSmtp(e.target.value)}
                 />
-                <p className="mt-1.5 text-xs text-dark/45">
+                <p className="mt-1.5 text-xs text-dark/65">
                   Guardada criptografada no banco. No Gmail, use uma senha de
                   app — a senha da conta e recusada.
                 </p>
@@ -625,7 +625,7 @@ export default function ConfiguracoesPage() {
                   <Mail className="h-4 w-4 text-navy" />
                   Enviar email de teste
                 </p>
-                <p className="mb-3 text-xs text-dark/45">
+                <p className="mb-3 text-xs text-dark/65">
                   Salve as configuracoes antes — o teste usa o que esta no banco.
                 </p>
                 <div className="flex gap-2">
@@ -669,7 +669,7 @@ export default function ConfiguracoesPage() {
                       "px-2.5 py-1.5 transition",
                       paginaPreview === p
                         ? "bg-navy text-white"
-                        : "bg-white text-dark/50 hover:bg-cinza",
+                        : "bg-white text-dark/70 hover:bg-cinza",
                     )}
                   >
                     {p === "primeira" ? "1a pagina" : "Ultima"}
@@ -705,7 +705,7 @@ export default function ConfiguracoesPage() {
               Gerar PDF de teste
             </button>
 
-            <p className="mt-3 text-center text-[11px] leading-relaxed text-dark/40">
+            <p className="mt-3 text-center text-[11px] leading-relaxed text-dark/62">
               Roda o pipeline real no servidor com uma peticao de exemplo.
               <br />
               Use para conferir se o PDF bate com o preview. Salve antes.

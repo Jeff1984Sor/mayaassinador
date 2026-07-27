@@ -60,6 +60,51 @@ def envelope(escritorio: Escritorio | None, titulo: str, corpo_html: str) -> str
 </html>"""
 
 
+def email_documento(
+    escritorio: Escritorio | None,
+    titulo: str,
+    mensagem: str,
+    nome_arquivo: str,
+    codigo: str | None,
+    url_verificacao: str | None,
+) -> tuple[str, str]:
+    """Corpo do email que leva o PDF assinado. Retorna (html, texto)."""
+    paragrafos = "".join(
+        f"<p style='margin:0 0 12px;'>{escape(linha)}</p>"
+        for linha in mensagem.strip().splitlines()
+        if linha.strip()
+    ) or "<p style='margin:0 0 12px;'>Segue em anexo o documento assinado.</p>"
+
+    bloco_verificacao = ""
+    if codigo and url_verificacao:
+        bloco_verificacao = f"""
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+               style="margin-top:20px;background:{CINZA};border-radius:8px;">
+          <tr><td style="padding:14px 16px;font-size:13px;color:{TEXTO};">
+            <strong style="color:{NAVY};">Autenticidade</strong><br>
+            Codigo <span style="font-family:monospace;">{escape(codigo)}</span><br>
+            <a href="{escape(url_verificacao)}" style="color:{NAVY};">
+              Verificar este documento
+            </a>
+          </td></tr>
+        </table>"""
+
+    html = envelope(
+        escritorio,
+        titulo,
+        f"{paragrafos}"
+        f"<p style='margin:16px 0 0;font-size:13px;color:#8a90a3;'>"
+        f"Anexo: {escape(nome_arquivo)}</p>"
+        f"{bloco_verificacao}",
+    )
+
+    texto = f"{mensagem.strip()}\n\nAnexo: {nome_arquivo}"
+    if codigo and url_verificacao:
+        texto += f"\n\nCodigo de autenticidade: {codigo}\n{url_verificacao}"
+
+    return html, texto
+
+
 def email_teste(escritorio: Escritorio | None) -> tuple[str, str, str]:
     """Retorna (assunto, html, texto) do email de teste da tela de configuracoes."""
     assunto = "MayaAssinador — email de teste"

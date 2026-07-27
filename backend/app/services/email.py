@@ -38,15 +38,26 @@ def enviar(
     corpo_html: str,
     corpo_texto: str | None = None,
     anexos: list[Path] | None = None,
+    remetente_nome: str | None = None,
+    remetente_email: str | None = None,
 ) -> None:
-    """Envia o email. Levanta FalhaEnvio com mensagem legivel em caso de erro."""
+    """Envia o email. Levanta FalhaEnvio com mensagem legivel em caso de erro.
+
+    remetente_email troca o endereco do From. Cuidado: Gmail e Microsoft 365
+    recusam enviar em nome de um endereco que nao seja o autenticado (ou um
+    alias verificado). Por isso o padrao continua sendo o usuario do SMTP.
+    """
     host, porta, usuario, senha = _credenciais(config)
 
     msg = EmailMessage()
     msg["Subject"] = assunto
-    remetente = config.email_remetente_nome or usuario
-    msg["From"] = f"{remetente} <{usuario}>"
+    nome = remetente_nome or config.email_remetente_nome or usuario
+    endereco = remetente_email or usuario
+    msg["From"] = f"{nome} <{endereco}>"
     msg["To"] = ", ".join(destinatarios)
+    if endereco != usuario:
+        # se o provedor reescrever o From, a resposta ainda volta pro lugar certo
+        msg["Reply-To"] = endereco
 
     msg.set_content(corpo_texto or "Seu leitor de email nao suporta HTML.")
     msg.add_alternative(corpo_html, subtype="html")

@@ -17,13 +17,13 @@
   }
 
   .campo {
-    @apply w-full rounded-lg border border-dark/10 bg-white px-3.5 py-2.5 text-sm
-           placeholder:text-dark/35
+    @apply w-full rounded-lg border border-dark/15 bg-white px-3.5 py-2.5 text-sm text-dark
+           placeholder:text-dark/50
            focus:border-indigo focus:outline-none focus:ring-2 focus:ring-indigo/25;
   }
 
   .rotulo {
-    @apply mb-1.5 block text-sm font-medium text-dark/75;
+    @apply mb-1.5 block text-sm font-medium text-dark/90;
   }
 
   .cartao {

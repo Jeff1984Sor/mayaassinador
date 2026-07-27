@@ -15,15 +15,28 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import DbSession, TenantAtual, TenantFlex, UsuarioAtual
 from app.core.config import settings
 from app.core.storage import caminho_absoluto, dir_documento, para_relativo
-from app.models import ConfiguracaoTenant, Documento, StatusDocumento, TipoEvento
+from app.models import (
+    ConfiguracaoTenant,
+    Documento,
+    EnvioEmail,
+    Escritorio,
+    StatusDocumento,
+    StatusEnvio,
+    TipoEvento,
+)
 from app.schemas.documento import (
     DocumentoDetalhe,
     DocumentoOut,
+    EnviarEmailRequest,
+    EnvioOut,
     ListaDocumentos,
+    PadraoEmail,
     RenomearRequest,
     ResumoDocumentos,
 )
+from app.services import email as servico_email
 from app.services.pipeline import registrar_evento
+from app.services.templates_email import email_documento
 
 router = APIRouter(prefix="/{tenant}/documentos", tags=["documentos"])
 
@@ -166,7 +179,7 @@ def obter(
 ) -> DocumentoDetalhe:
     documento = db.scalar(
         select(Documento)
-        .options(selectinload(Documento.eventos))
+        .options(selectinload(Documento.eventos), selectinload(Documento.envios))
         .where(
             Documento.id == documento_id,
             Documento.tenant_id == tenant.id,
@@ -297,6 +310,136 @@ def renomear(
     db.refresh(documento)
 
     return DocumentoOut.model_validate(documento)
+
+
+@router.get("/{documento_id}/email-padrao", response_model=PadraoEmail)
+def padrao_email(
+    documento_id: int, tenant: TenantAtual, db: DbSession, _: UsuarioAtual
+) -> PadraoEmail:
+    """Valores que o modal de envio usa como ponto de partida."""
+    documento = _buscar(db, tenant.id, documento_id)
+    config = db.scalar(
+        select(ConfiguracaoTenant).where(ConfiguracaoTenant.tenant_id == tenant.id)
+    )
+    escritorio = db.scalar(select(Escritorio).where(Escritorio.tenant_id == tenant.id))
+
+    remetente_email = (config.smtp_usuario if config else None) or ""
+    remetente_nome = (
+        (config.email_remetente_nome if config else None)
+        or (escritorio.razao_social if escritorio else None)
+        or ""
+    )
+    assunto = (config.email_assunto_padrao if config else None) or (
+        f"Documento assinado — {documento.nome_original.rsplit('.', 1)[0]}"
+    )
+
+    return PadraoEmail(
+        assunto=assunto,
+        mensagem=(config.email_mensagem_padrao if config else None)
+        or "Prezado(a),\n\nSegue em anexo o documento assinado.\n\nAtenciosamente.",
+        remetente_nome=remetente_nome,
+        remetente_email=remetente_email,
+        smtp_configurado=bool(
+            config and config.smtp_host and config.smtp_usuario and config.smtp_senha_cripto
+        ),
+    )
+
+
+@router.post("/{documento_id}/enviar-email", response_model=EnvioOut)
+def enviar_por_email(
+    documento_id: int,
+    dados: EnviarEmailRequest,
+    tenant: TenantAtual,
+    db: DbSession,
+    _: UsuarioAtual,
+) -> EnvioOut:
+    """Envia o PDF final como anexo e registra o envio no historico."""
+    documento = _buscar(db, tenant.id, documento_id)
+
+    if not documento.caminho_final:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "O PDF final ainda nao foi gerado. Aguarde o processamento terminar.",
+        )
+
+    caminho = caminho_absoluto(documento.caminho_final)
+    if not caminho.exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "PDF final ausente no storage")
+
+    config = db.scalar(
+        select(ConfiguracaoTenant).where(ConfiguracaoTenant.tenant_id == tenant.id)
+    )
+    if config is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Configuracao nao encontrada")
+
+    escritorio = db.scalar(select(Escritorio).where(Escritorio.tenant_id == tenant.id))
+    destinatarios = [str(e) for e in dados.destinatarios]
+
+    # o registro nasce PENDENTE: se o envio falhar, o historico guarda o erro
+    envio = EnvioEmail(
+        documento_id=documento.id,
+        destinatarios=destinatarios,
+        assunto=dados.assunto,
+        mensagem=dados.mensagem,
+        status=StatusEnvio.PENDENTE,
+    )
+    db.add(envio)
+    db.flush()
+
+    nome_pdf = f"{documento.nome_original.rsplit('.', 1)[0]}.pdf"
+    url_verificacao = (
+        f"{settings.PUBLIC_BASE_URL}/verificar/{documento.codigo_verificacao}"
+        if documento.codigo_verificacao
+        else None
+    )
+    html, texto = email_documento(
+        escritorio=escritorio,
+        titulo=dados.assunto,
+        mensagem=dados.mensagem,
+        nome_arquivo=nome_pdf,
+        codigo=documento.codigo_verificacao,
+        url_verificacao=url_verificacao,
+    )
+
+    anexo = caminho.with_name(nome_pdf)
+    try:
+        # copia temporaria so para o anexo sair com o nome do documento
+        anexo.write_bytes(caminho.read_bytes())
+        servico_email.enviar(
+            config=config,
+            destinatarios=destinatarios,
+            assunto=dados.assunto,
+            corpo_html=html,
+            corpo_texto=texto,
+            anexos=[anexo],
+            remetente_nome=dados.remetente_nome,
+            remetente_email=str(dados.remetente_email) if dados.remetente_email else None,
+        )
+    except (servico_email.EmailNaoConfigurado, servico_email.FalhaEnvio) as exc:
+        envio.status = StatusEnvio.ERRO
+        envio.erro_msg = str(exc)
+        registrar_evento(db, documento.id, TipoEvento.ERRO, f"Email: {exc}"[:500])
+        db.commit()
+        codigo_http = (
+            status.HTTP_400_BAD_REQUEST
+            if isinstance(exc, servico_email.EmailNaoConfigurado)
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        raise HTTPException(codigo_http, str(exc)) from exc
+    finally:
+        if anexo != caminho:
+            anexo.unlink(missing_ok=True)
+
+    envio.status = StatusEnvio.ENVIADO
+    envio.enviado_em = datetime.now(timezone.utc)
+    documento.status = StatusDocumento.ENVIADO_EMAIL
+    registrar_evento(
+        db, documento.id, TipoEvento.EMAIL_ENVIADO, ", ".join(destinatarios)[:500]
+    )
+    db.commit()
+    db.refresh(envio)
+
+    return EnvioOut.model_validate(envio)
 
 
 @router.delete("/{documento_id}", status_code=status.HTTP_204_NO_CONTENT)

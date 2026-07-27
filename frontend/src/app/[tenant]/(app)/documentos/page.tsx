@@ -22,6 +22,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { ModalEmail } from "@/components/documentos/modal-email";
 import { ModalUpload } from "@/components/documentos/modal-upload";
 import {
   ModalConfirmar,
@@ -44,6 +45,7 @@ import { useAuth } from "@/store/auth";
 
 type Acao =
   | { tipo: "preview"; doc: Documento }
+  | { tipo: "email"; doc: Documento }
   | { tipo: "excluir"; doc: Documento }
   | { tipo: "reprocessar"; doc: Documento }
   | { tipo: "renomear"; doc: Documento }
@@ -175,7 +177,7 @@ export default function DocumentosPage() {
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-dark">Documentos</h1>
-          <p className="mt-1 text-sm text-dark/55">
+          <p className="mt-1 text-sm text-dark/75">
             Envie um .docx e receba o PDF timbrado, rubricado e assinado.
           </p>
         </div>
@@ -191,7 +193,7 @@ export default function DocumentosPage() {
             <Icone className={cn("h-5 w-5 shrink-0", cor)} />
             <div>
               <p className="text-xl font-semibold leading-none text-dark">{valor}</p>
-              <p className="mt-1 text-xs text-dark/50">{rotulo}</p>
+              <p className="mt-1 text-xs text-dark/70">{rotulo}</p>
             </div>
           </div>
         ))}
@@ -202,7 +204,7 @@ export default function DocumentosPage() {
         <div className="min-w-[220px] flex-1">
           <label className="rotulo">Buscar</label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark/30" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark/50" />
             <input
               className="campo pl-9"
               placeholder="Nome do arquivo"
@@ -251,7 +253,7 @@ export default function DocumentosPage() {
           <button
             onClick={limparFiltros}
             className="flex items-center gap-1.5 rounded-lg border border-dark/10 px-3 py-2.5
-                       text-sm text-dark/60 transition hover:bg-cinza"
+                       text-sm text-dark/80 transition hover:bg-cinza"
           >
             <X className="h-4 w-4" />
             Limpar
@@ -273,7 +275,7 @@ export default function DocumentosPage() {
             <h2 className="text-base font-medium text-dark">
               {temFiltro ? "Nenhum resultado" : "Nenhum documento ainda"}
             </h2>
-            <p className="mt-1.5 max-w-xs text-sm text-dark/50">
+            <p className="mt-1.5 max-w-xs text-sm text-dark/70">
               {temFiltro
                 ? "Ajuste a busca ou os filtros para encontrar o documento."
                 : "Envie seu primeiro .docx e veja o pipeline montar o PDF timbrado."}
@@ -299,7 +301,7 @@ export default function DocumentosPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-dark/[.07] text-left text-xs uppercase tracking-wide text-dark/45">
+                <tr className="border-b border-dark/[.07] text-left text-xs uppercase tracking-wide text-dark/65">
                   <th className="px-5 py-3 font-medium">Arquivo</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">Paginas</th>
@@ -329,7 +331,7 @@ export default function DocumentosPage() {
                           <p className="mt-0.5 max-w-md text-xs text-risco">{d.erro_msg}</p>
                         )}
                         {d.codigo_verificacao && (
-                          <p className="mt-0.5 font-mono text-[11px] text-dark/35">
+                          <p className="mt-0.5 font-mono text-[11px] text-dark/55">
                             {d.codigo_verificacao}
                           </p>
                         )}
@@ -347,11 +349,11 @@ export default function DocumentosPage() {
                         </span>
                       </td>
 
-                      <td className="px-5 py-3.5 text-dark/60">{d.paginas ?? "—"}</td>
-                      <td className="px-5 py-3.5 text-dark/60">
+                      <td className="px-5 py-3.5 text-dark/80">{d.paginas ?? "—"}</td>
+                      <td className="px-5 py-3.5 text-dark/80">
                         {formatarTamanho(d.tamanho)}
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-dark/60">
+                      <td className="whitespace-nowrap px-5 py-3.5 text-dark/80">
                         {formatarData(d.criado_em)}
                       </td>
 
@@ -378,6 +380,14 @@ export default function DocumentosPage() {
                             href={urlArquivo(d.id, "original")}
                           >
                             <Paperclip className="h-4 w-4" />
+                          </BotaoAcao>
+
+                          <BotaoAcao
+                            titulo="Enviar por email"
+                            desabilitado={!pronto}
+                            onClick={() => setAcao({ tipo: "email", doc: d })}
+                          >
+                            <Mail className="h-4 w-4" />
                           </BotaoAcao>
 
                           <BotaoAcao
@@ -414,7 +424,7 @@ export default function DocumentosPage() {
       </div>
 
       {lista && lista.total > 0 && (
-        <p className="mt-3 text-xs text-dark/40">
+        <p className="mt-3 text-xs text-dark/62">
           {lista.itens.length} de {lista.total} documento
           {lista.total === 1 ? "" : "s"}
           {temFiltro && " (filtrado)"}
@@ -437,6 +447,18 @@ export default function DocumentosPage() {
         <ModalPreview
           doc={acao.doc}
           url={urlArquivo(acao.doc.id, "final", true)}
+          aoFechar={() => setAcao(null)}
+        />
+      )}
+
+      {acao?.tipo === "email" && (
+        <ModalEmail
+          tenant={tenant}
+          doc={acao.doc}
+          aoEnviado={() => {
+            setAcao(null);
+            atualizar();
+          }}
           aoFechar={() => setAcao(null)}
         />
       )}
@@ -496,8 +518,8 @@ function BotaoAcao({
     desabilitado
       ? "cursor-not-allowed text-dark/15"
       : perigo
-        ? "text-dark/40 hover:bg-risco/10 hover:text-risco"
-        : "text-dark/40 hover:bg-navy/10 hover:text-navy",
+        ? "text-dark/62 hover:bg-risco/10 hover:text-risco"
+        : "text-dark/62 hover:bg-navy/10 hover:text-navy",
   );
 
   if (href && !desabilitado) {

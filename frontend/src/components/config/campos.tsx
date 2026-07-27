@@ -84,9 +84,9 @@ export function Marcador({
         className="mt-0.5 h-4 w-4 rounded border-dark/20 text-navy accent-navy"
       />
       <span>
-        <span className="text-sm text-dark/85">{rotulo}</span>
+        <span className="text-sm text-dark/95">{rotulo}</span>
         {descricao && (
-          <span className="block text-xs text-dark/45">{descricao}</span>
+          <span className="block text-xs text-dark/65">{descricao}</span>
         )}
       </span>
     </label>
@@ -117,7 +117,7 @@ export function EditorTipografia({
 
   return (
     <fieldset className="rounded-lg border border-dark/[.08] p-4">
-      <legend className="px-1.5 text-xs font-medium uppercase tracking-wide text-dark/45">
+      <legend className="px-1.5 text-xs font-medium uppercase tracking-wide text-dark/65">
         {titulo}
       </legend>
 
@@ -163,7 +163,7 @@ export function EditorTipografia({
                   "px-3 py-2.5 transition",
                   valor.alinhamento === a
                     ? "bg-navy text-white"
-                    : "bg-white text-dark/50 hover:bg-cinza",
+                    : "bg-white text-dark/70 hover:bg-cinza",
                 )}
                 aria-label={a}
               >
@@ -181,7 +181,7 @@ export function EditorTipografia({
               onClick={() => set("negrito", !valor.negrito)}
               className={cn(
                 "px-3 py-2.5 transition",
-                valor.negrito ? "bg-navy text-white" : "bg-white text-dark/50 hover:bg-cinza",
+                valor.negrito ? "bg-navy text-white" : "bg-white text-dark/70 hover:bg-cinza",
               )}
               aria-label="negrito"
             >
@@ -192,7 +192,7 @@ export function EditorTipografia({
               onClick={() => set("italico", !valor.italico)}
               className={cn(
                 "px-3 py-2.5 transition",
-                valor.italico ? "bg-navy text-white" : "bg-white text-dark/50 hover:bg-cinza",
+                valor.italico ? "bg-navy text-white" : "bg-white text-dark/70 hover:bg-cinza",
               )}
               aria-label="italico"
             >
@@ -210,7 +210,7 @@ export function EditorTipografia({
               onChange={(e) => set("cor", e.target.value.toUpperCase())}
               className="h-[42px] w-12 cursor-pointer rounded-lg border border-dark/10 bg-white p-1"
             />
-            <span className="font-mono text-xs text-dark/45">{valor.cor}</span>
+            <span className="font-mono text-xs text-dark/65">{valor.cor}</span>
           </div>
         </div>
       </div>

@@ -61,7 +61,7 @@ export function UploadImagem({
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-dark">{titulo}</p>
-          <p className="text-xs text-dark/45">{descricao}</p>
+          <p className="text-xs text-dark/65">{descricao}</p>
         </div>
         <div className="flex shrink-0 gap-2">
           <button
@@ -69,7 +69,7 @@ export function UploadImagem({
             onClick={() => input.current?.click()}
             disabled={ocupado}
             className="inline-flex items-center gap-1.5 rounded-lg border border-dark/10 px-3 py-1.5
-                       text-xs font-medium text-dark/70 transition hover:bg-cinza disabled:opacity-50"
+                       text-xs font-medium text-dark/88 transition hover:bg-cinza disabled:opacity-50"
           >
             {ocupado ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -117,7 +117,7 @@ export function UploadImagem({
         </div>
       ) : (
         <div className="flex h-24 items-center justify-center rounded-lg border border-dashed
-                        border-dark/15 text-xs text-dark/35">
+                        border-dark/15 text-xs text-dark/55">
           Nenhuma imagem enviada
         </div>
       )}
@@ -136,7 +136,7 @@ function Quadro({
 }) {
   return (
     <div>
-      <p className="mb-1 text-[11px] uppercase tracking-wide text-dark/40">
+      <p className="mb-1 text-[11px] uppercase tracking-wide text-dark/62">
         {rotulo}
       </p>
       <div

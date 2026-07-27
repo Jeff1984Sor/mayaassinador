@@ -33,12 +33,12 @@ function Moldura({
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-dark">{titulo}</h2>
             {subtitulo && (
-              <p className="mt-0.5 truncate text-xs text-dark/50">{subtitulo}</p>
+              <p className="mt-0.5 truncate text-xs text-dark/70">{subtitulo}</p>
             )}
           </div>
           <button
             onClick={aoFechar}
-            className="ml-3 rounded-lg p-1 text-dark/35 transition hover:bg-cinza hover:text-dark/70"
+            className="ml-3 rounded-lg p-1 text-dark/55 transition hover:bg-cinza hover:text-dark/88"
           >
             <X className="h-4 w-4" />
           </button>
@@ -73,7 +73,7 @@ export function ModalPreview({
         <>
           <a
             href={url.replace("&inline=true", "")}
-            className="rounded-lg px-4 py-2.5 text-sm text-dark/60 transition hover:bg-cinza"
+            className="rounded-lg px-4 py-2.5 text-sm text-dark/80 transition hover:bg-cinza"
           >
             Baixar
           </a>
@@ -114,7 +114,7 @@ export function ModalConfirmar({
         <>
           <button
             onClick={aoFechar}
-            className="rounded-lg px-4 py-2.5 text-sm text-dark/60 transition hover:bg-cinza"
+            className="rounded-lg px-4 py-2.5 text-sm text-dark/80 transition hover:bg-cinza"
           >
             Cancelar
           </button>
@@ -137,7 +137,7 @@ export function ModalConfirmar({
         {perigo && (
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-risco" />
         )}
-        <p className="text-sm leading-relaxed text-dark/70">{mensagem}</p>
+        <p className="text-sm leading-relaxed text-dark/88">{mensagem}</p>
       </div>
     </Moldura>
   );
@@ -165,7 +165,7 @@ export function ModalRenomear({
         <>
           <button
             onClick={aoFechar}
-            className="rounded-lg px-4 py-2.5 text-sm text-dark/60 transition hover:bg-cinza"
+            className="rounded-lg px-4 py-2.5 text-sm text-dark/80 transition hover:bg-cinza"
           >
             Cancelar
           </button>
@@ -190,7 +190,7 @@ export function ModalRenomear({
             onChange={(e) => setNome(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && nome.trim() && aoSalvar(nome)}
           />
-          <span className="font-mono text-sm text-dark/40">.docx</span>
+          <span className="font-mono text-sm text-dark/62">.docx</span>
         </div>
       </div>
     </Moldura>

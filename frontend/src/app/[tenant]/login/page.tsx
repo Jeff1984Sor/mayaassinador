@@ -67,7 +67,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-navy">
             MayaAssinador
           </h1>
-          <p className="mt-1 text-sm text-dark/55">
+          <p className="mt-1 text-sm text-dark/75">
             Documentos timbrados, rubricados e assinados
           </p>
         </div>
@@ -119,7 +119,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-dark/40">
+        <p className="mt-6 text-center text-xs text-dark/62">
           MayaCorp · {new Date().getFullYear()}
         </p>
       </div>

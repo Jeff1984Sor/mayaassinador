@@ -36,7 +36,7 @@ export function StepperPipeline({ doc }: { doc: DocumentoDetalhe }) {
                 feita && "border-teal bg-teal text-white",
                 atual && "border-amber bg-amber/10 text-amber",
                 falhou && "border-risco bg-risco/10 text-risco",
-                !feita && !atual && !falhou && "border-dark/12 text-dark/25",
+                !feita && !atual && !falhou && "border-dark/12 text-dark/45",
               )}
             >
               {feita ? (
@@ -53,10 +53,10 @@ export function StepperPipeline({ doc }: { doc: DocumentoDetalhe }) {
             <span
               className={cn(
                 "text-sm transition-colors",
-                feita && "text-dark/80",
+                feita && "text-dark/92",
                 atual && "font-medium text-dark",
                 falhou && "font-medium text-risco",
-                !feita && !atual && !falhou && "text-dark/35",
+                !feita && !atual && !falhou && "text-dark/55",
               )}
             >
               {etapa.rotulo}

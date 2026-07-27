@@ -54,7 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition",
                   ativo
                     ? "bg-white/10 font-medium text-white"
-                    : "text-white/55 hover:bg-white/5 hover:text-white/85",
+                    : "text-white/75 hover:bg-white/5 hover:text-white/95",
                 )}
               >
                 <Icone className="h-4 w-4" />
@@ -69,7 +69,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <p className="truncate text-sm font-medium text-white">
               {usuario?.nome}
             </p>
-            <p className="truncate text-xs text-white/40">{usuario?.email}</p>
+            <p className="truncate text-xs text-white/62">{usuario?.email}</p>
           </div>
           <button
             onClick={() => {
@@ -77,7 +77,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               router.replace(`/${tenant}/login`);
             }}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm
-                       text-white/55 transition hover:bg-white/5 hover:text-white/85"
+                       text-white/75 transition hover:bg-white/5 hover:text-white/95"
           >
             <LogOut className="h-4 w-4" />
             Sair
