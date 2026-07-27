@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Mail, Save, Send } from "lucide-react";
+import { FileText, Loader2, Mail, Save, Send } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +23,54 @@ const ABAS = [
 ] as const;
 
 type AbaId = (typeof ABAS)[number]["id"];
+
+/** Presets dos provedores mais usados por escritorio.
+ *  Evita o suporte "qual e a porta mesmo?" — e os avisos de senha de app
+ *  sao a causa numero 1 de falha de autenticacao. */
+const PROVEDORES = [
+  {
+    id: "gmail",
+    nome: "Gmail",
+    host: "smtp.gmail.com",
+    porta: 587,
+    tls: true,
+    aviso:
+      "O Gmail recusa a senha da conta. Ative a verificacao em duas etapas e gere uma Senha de app em myaccount.google.com/apppasswords.",
+  },
+  {
+    id: "m365",
+    nome: "Microsoft 365 / Outlook",
+    host: "smtp.office365.com",
+    porta: 587,
+    tls: true,
+    aviso:
+      "Se a conta tiver MFA, gere uma senha de aplicativo. O administrador precisa manter o SMTP AUTH habilitado na caixa.",
+  },
+  {
+    id: "zoho",
+    nome: "Zoho Mail",
+    host: "smtp.zoho.com",
+    porta: 587,
+    tls: true,
+    aviso: "Use uma senha especifica de aplicativo gerada no painel do Zoho.",
+  },
+  {
+    id: "locaweb",
+    nome: "Locaweb",
+    host: "email-ssl.com.br",
+    porta: 587,
+    tls: true,
+    aviso: "Usuario e o endereco de email completo. A senha e a do painel de email.",
+  },
+  {
+    id: "hostgator",
+    nome: "HostGator / cPanel",
+    host: "mail.seudominio.com.br",
+    porta: 587,
+    tls: true,
+    aviso: "Troque 'seudominio.com.br' pelo dominio do escritorio.",
+  },
+] as const;
 
 const CAMPOS_CABECALHO: { chave: keyof Configuracao["cabecalho_campos"]; rotulo: string }[] = [
   { chave: "razao_social", rotulo: "Razao social" },
@@ -116,6 +164,22 @@ export default function ConfiguracoesPage() {
     onError: (e) => toast.error(mensagemErro(e, "Nao foi possivel salvar")),
   });
 
+  const pdfTeste = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post(
+        `/api/${tenant}/configuracoes/pdf-teste`,
+        {},
+        { responseType: "blob" },
+      );
+      // abre numa aba nova em vez de baixar: a ideia e comparar com o
+      // preview ao lado, nao arquivar o teste
+      const url = URL.createObjectURL(data as Blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    },
+    onError: (e) => toast.error(mensagemErro(e, "Falha ao gerar o PDF de teste")),
+  });
+
   const testarEmail = useMutation({
     mutationFn: async () =>
       (
@@ -140,6 +204,8 @@ export default function ConfiguracoesPage() {
       </div>
     );
   }
+
+  const provedorAtual = PROVEDORES.find((p) => p.host === cfg.smtp_host);
 
   const setEscritorio = <K extends keyof Escritorio>(k: K, v: Escritorio[K]) =>
     setEsc({ ...esc, [k]: v });
@@ -443,6 +509,42 @@ export default function ConfiguracoesPage() {
 
           {aba === "email" && (
             <>
+              <div>
+                <p className="rotulo">Provedor</p>
+                <div className="flex flex-wrap gap-2">
+                  {PROVEDORES.map((p) => {
+                    const ativo = cfg.smtp_host === p.host;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() =>
+                          setCfg({
+                            ...cfg,
+                            smtp_host: p.host,
+                            smtp_porta: p.porta,
+                            smtp_tls: p.tls,
+                          })
+                        }
+                        className={cn(
+                          "rounded-lg border px-3 py-1.5 text-xs font-medium transition",
+                          ativo
+                            ? "border-navy bg-navy text-white"
+                            : "border-dark/12 text-dark/65 hover:border-navy/35 hover:bg-cinza",
+                        )}
+                      >
+                        {p.nome}
+                      </button>
+                    );
+                  })}
+                </div>
+                {provedorAtual && (
+                  <p className="mt-2 rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">
+                    {provedorAtual.aviso}
+                  </p>
+                )}
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-3">
                 <Campo
                   rotulo="Servidor SMTP"
@@ -588,10 +690,25 @@ export default function ConfiguracoesPage() {
               />
             </div>
 
+            <button
+              onClick={() => pdfTeste.mutate()}
+              disabled={pdfTeste.isPending}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg
+                         border border-navy/20 py-2.5 text-sm font-medium text-navy
+                         transition hover:bg-navy/5 disabled:opacity-60"
+            >
+              {pdfTeste.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              Gerar PDF de teste
+            </button>
+
             <p className="mt-3 text-center text-[11px] leading-relaxed text-dark/40">
-              Simulacao em A4 com os dados reais do escritorio.
+              Roda o pipeline real no servidor com uma peticao de exemplo.
               <br />
-              Atualiza a cada alteracao, sem salvar.
+              Use para conferir se o PDF bate com o preview. Salve antes.
             </p>
           </div>
         </div>
