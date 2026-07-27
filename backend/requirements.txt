@@ -1,0 +1,28 @@
+# ---- Web ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# ---- Banco ----
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
+alembic==1.14.0
+
+# ---- Config / validacao ----
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# ---- Auth / cripto ----
+# Nota: usamos bcrypt direto, sem passlib. O passlib 1.7.4 le
+# bcrypt.__about__, removido no bcrypt >= 4.1, e polui o log com warning.
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+cryptography==44.0.0
+
+# ---- Pipeline de documentos (usado a partir da F3) ----
+python-docx==1.1.2
+pypdf==5.1.0
+reportlab==4.2.5
+Pillow==11.0.0
+qrcode==8.0
