@@ -1,0 +1,23 @@
+[Unit]
+Description=MayaAssinador Frontend (Next.js) — porta 3030
+After=network.target mayaassinador-api.service
+Wants=mayaassinador-api.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/mayaassinador/frontend
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mayaassinador-frontend
+
+Environment=NODE_ENV=production
+Environment=HOME=/home/deploy
+Environment=PORT=3030
+
+[Install]
+WantedBy=multi-user.target
