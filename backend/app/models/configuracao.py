@@ -60,6 +60,13 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     logo_posicao: Mapped[str] = mapped_column(String(20), default="esquerda")
 
     # ---- Rodape ----
+    # mesma ideia do cabecalho: quais dados do escritorio aparecem.
+    # Padrao tudo false — o rodape historicamente so tinha texto livre.
+    rodape_campos: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=lambda: {"razao_social": False, "cnpj": False, "oab": False,
+                                "endereco": False, "telefone": False, "whatsapp": False,
+                                "email": False, "site": False}
+    )
     rodape_texto: Mapped[str | None] = mapped_column(Text)
     rodape_tipografia: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=lambda: dict(TIPOGRAFIA_PADRAO)
@@ -72,6 +79,11 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     rubrica_path: Mapped[str | None] = mapped_column(String(500))
     assinatura_path: Mapped[str | None] = mapped_column(String(500))
     rubricar_por_padrao: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # QR de verificacao na ultima pagina. Opcional: nem todo escritorio quer
+    # um QR estampado no documento. Desligado, o hash e o codigo continuam
+    # sendo gerados e o documento segue verificavel pela pagina publica.
+    qrcode_ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # ---- SMTP (senha criptografada com Fernet, nunca em texto puro) ----
     smtp_host: Mapped[str | None] = mapped_column(String(255))

@@ -130,9 +130,15 @@ def processar(db: Session, documento: Documento) -> None:
     registrar_evento(db, documento.id, TipoEvento.CONVERTIDO_PDF)
 
     # ---- 6, 7 e 8: rubrica, assinatura, QR ----
+    # o codigo e o hash sao sempre gerados: o documento continua verificavel
+    # pela pagina publica mesmo quando o escritorio nao quer o QR estampado
     codigo = documento.codigo_verificacao or gerar_codigo_verificacao(db)
     documento.codigo_verificacao = codigo
-    url_verificacao = f"{settings.PUBLIC_BASE_URL}/verificar/{codigo}"
+    url_verificacao = (
+        f"{settings.PUBLIC_BASE_URL}/verificar/{codigo}"
+        if config.qrcode_ativo
+        else None
+    )
 
     rubrica = _imagem(config, "rubrica_path") if documento.rubricado else None
     assinatura = _imagem(config, "assinatura_path")
@@ -144,7 +150,7 @@ def processar(db: Session, documento: Documento) -> None:
             rubrica=rubrica,
             assinatura=assinatura,
             url_verificacao=url_verificacao,
-            codigo=formatar_codigo(codigo),
+            codigo=formatar_codigo(codigo) if config.qrcode_ativo else None,
         )
     except pdf_carimbo.FalhaCarimbo as exc:
         raise FalhaPipeline(str(exc)) from exc

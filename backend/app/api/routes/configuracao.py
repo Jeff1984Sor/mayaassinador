@@ -74,7 +74,12 @@ def atualizar(
     if senha:
         obj.smtp_senha_cripto = criptografar(senha)
 
-    for campo in ("cabecalho_campos", "cabecalho_tipografia", "rodape_tipografia"):
+    for campo in (
+        "cabecalho_campos",
+        "cabecalho_tipografia",
+        "rodape_campos",
+        "rodape_tipografia",
+    ):
         valores[campo] = dict(valores[campo])
 
     for campo, valor in valores.items():

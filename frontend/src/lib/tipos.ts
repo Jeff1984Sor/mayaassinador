@@ -47,11 +47,13 @@ export type Configuracao = {
   cabecalho_campos: CabecalhoCampos;
   cabecalho_tipografia: Tipografia;
   logo_posicao: PosicaoLogo;
+  rodape_campos: CabecalhoCampos;
   rodape_texto: string | null;
   rodape_tipografia: Tipografia;
   rodape_numeracao: boolean;
   rodape_numeracao_alinhamento: Alinhamento;
   rubricar_por_padrao: boolean;
+  qrcode_ativo: boolean;
   rubrica_url: string | null;
   assinatura_url: string | null;
   rubrica_original_url: string | null;

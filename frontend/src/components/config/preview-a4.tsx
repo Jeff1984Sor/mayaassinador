@@ -35,9 +35,10 @@ function estilo(t: Tipografia): React.CSSProperties {
   };
 }
 
-/** Monta as linhas do cabecalho a partir dos Dados do Escritorio,
- *  respeitando os checkboxes. Mesma regra que o python-docx aplicara. */
-export function linhasCabecalho(
+/** Monta linhas a partir dos Dados do Escritorio, respeitando os checkboxes.
+ *  Serve cabecalho e rodape. Mesma regra que o python-docx aplicara
+ *  (`linhas_escritorio` em docx_timbre.py) — manter as duas em sincronia. */
+export function linhasEscritorio(
   esc: Escritorio | undefined,
   campos: Configuracao["cabecalho_campos"],
 ): string[] {
@@ -81,7 +82,7 @@ function Cabecalho({
   escritorio?: Escritorio;
   logoSrc: string | null;
 }) {
-  const linhas = linhasCabecalho(escritorio, config.cabecalho_campos);
+  const linhas = linhasEscritorio(escritorio, config.cabecalho_campos);
   const t = config.cabecalho_tipografia;
   const pos = config.logo_posicao;
   const temLogo = pos !== "sem_logo" && !!logoSrc;
@@ -138,9 +139,25 @@ function Cabecalho({
   );
 }
 
-function Rodape({ config, pagina, total }: { config: Configuracao; pagina: number; total: number }) {
+function Rodape({
+  config,
+  escritorio,
+  pagina,
+  total,
+}: {
+  config: Configuracao;
+  escritorio?: Escritorio;
+  pagina: number;
+  total: number;
+}) {
   const t = config.rodape_tipografia;
-  const numeracaoNaEsquerda = config.rodape_numeracao_alinhamento === "esquerda";
+  const lado = config.rodape_numeracao_alinhamento;
+
+  // mesma ordem do docx_timbre: dados do escritorio, depois o texto livre
+  const conteudo = [
+    ...linhasEscritorio(escritorio, config.rodape_campos),
+    ...(config.rodape_texto ? [config.rodape_texto] : []),
+  ];
 
   const numeracao = config.rodape_numeracao ? (
     <span style={{ whiteSpace: "nowrap" }}>
@@ -148,26 +165,43 @@ function Rodape({ config, pagina, total }: { config: Configuracao; pagina: numbe
     </span>
   ) : null;
 
+  const base: React.CSSProperties = {
+    ...estilo(t),
+    borderTop: "0.75pt solid rgba(15,23,41,.2)",
+    paddingTop: 6,
+  };
+
+  // com uma linha so, texto e numeracao dividem a mesma altura
+  if (conteudo.length === 1 && numeracao && lado !== "centro") {
+    return (
+      <div
+        style={{
+          ...base,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          justifyContent: "space-between",
+        }}
+      >
+        {lado === "esquerda" && numeracao}
+        <span style={{ flex: 1, textAlign: ALINHA_CSS[t.alinhamento] }}>
+          {conteudo[0]}
+        </span>
+        {lado === "direita" && numeracao}
+      </div>
+    );
+  }
+
   return (
-    <div
-      style={{
-        ...estilo(t),
-        borderTop: "0.75pt solid rgba(15,23,41,.2)",
-        paddingTop: 6,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        justifyContent:
-          config.rodape_numeracao_alinhamento === "centro" ? "center" : "space-between",
-      }}
-    >
-      {numeracaoNaEsquerda && numeracao}
-      <span style={{ flex: 1, textAlign: ALINHA_CSS[t.alinhamento] }}>
-        {config.rodape_texto || (
-          <span className="italic opacity-40">Rodape sem texto</span>
-        )}
-      </span>
-      {!numeracaoNaEsquerda && numeracao}
+    <div style={base}>
+      {conteudo.length ? (
+        conteudo.map((linha, i) => <div key={i}>{linha}</div>)
+      ) : (
+        <div className="italic opacity-40">Rodape vazio</div>
+      )}
+      {numeracao && (
+        <div style={{ textAlign: ALINHA_CSS[lado] }}>{numeracao}</div>
+      )}
     </div>
   );
 }
@@ -317,8 +351,8 @@ export function PreviewA4({
             />
           )}
 
-          {/* QR de verificacao: so na ultima pagina */}
-          {ehUltima && (
+          {/* QR de verificacao: so na ultima pagina, e so se ativado */}
+          {ehUltima && config.qrcode_ativo && (
             <div
               style={{
                 position: "absolute",
@@ -347,7 +381,12 @@ export function PreviewA4({
           )}
         </div>
 
-        <Rodape config={config} pagina={ehUltima ? 4 : 1} total={4} />
+        <Rodape
+          config={config}
+          escritorio={escritorio}
+          pagina={ehUltima ? 4 : 1}
+          total={4}
+        />
       </Pagina>
     </div>
   );

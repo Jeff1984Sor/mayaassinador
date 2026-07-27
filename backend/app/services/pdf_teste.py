@@ -108,8 +108,10 @@ def gerar(config: ConfiguracaoTenant, escritorio: Escritorio | None, slug: str) 
         destino=final,
         rubrica=imagem("rubrica_path"),
         assinatura=imagem("assinatura_path"),
-        url_verificacao="https://exemplo/verificar/TESTE123",
-        codigo="TEST-E123",
+        url_verificacao=(
+            "https://exemplo/verificar/TESTE123" if config.qrcode_ativo else None
+        ),
+        codigo="TEST-E123" if config.qrcode_ativo else None,
     )
 
     for temporario in (exemplo, timbrado, convertido):

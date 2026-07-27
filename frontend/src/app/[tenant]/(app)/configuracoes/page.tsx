@@ -140,11 +140,13 @@ export default function ConfiguracoesPage() {
         cabecalho_campos: cfg.cabecalho_campos,
         cabecalho_tipografia: cfg.cabecalho_tipografia,
         logo_posicao: cfg.logo_posicao,
+        rodape_campos: cfg.rodape_campos,
         rodape_texto: cfg.rodape_texto,
         rodape_tipografia: cfg.rodape_tipografia,
         rodape_numeracao: cfg.rodape_numeracao,
         rodape_numeracao_alinhamento: cfg.rodape_numeracao_alinhamento,
         rubricar_por_padrao: cfg.rubricar_por_padrao,
+        qrcode_ativo: cfg.qrcode_ativo,
         smtp_host: cfg.smtp_host,
         smtp_porta: cfg.smtp_porta,
         smtp_usuario: cfg.smtp_usuario,
@@ -430,6 +432,29 @@ export default function ConfiguracoesPage() {
 
           {aba === "rodape" && (
             <>
+              <div>
+                <p className="rotulo">Quais dados aparecem no rodape</p>
+                <div className="grid grid-cols-2 gap-x-4">
+                  {CAMPOS_CABECALHO.map(({ chave, rotulo }) => (
+                    <Marcador
+                      key={chave}
+                      rotulo={rotulo}
+                      marcado={cfg.rodape_campos[chave]}
+                      onChange={(v) =>
+                        setConfig("rodape_campos", {
+                          ...cfg.rodape_campos,
+                          [chave]: v,
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+                <p className="mt-1 text-xs text-dark/65">
+                  Mesmos dados do cabecalho, escolhidos de forma independente.
+                  O rodape nao leva logo.
+                </p>
+              </div>
+
               <AreaTexto
                 rotulo="Texto do rodape"
                 valor={cfg.rodape_texto}
@@ -504,6 +529,25 @@ export default function ConfiguracoesPage() {
                 O fundo branco vira transparente automaticamente. Compare o
                 antes e o depois acima — o xadrez indica transparencia.
               </p>
+
+              <fieldset className="rounded-lg border border-dark/[.08] p-4">
+                <legend className="px-1.5 text-xs font-medium uppercase tracking-wide text-dark/65">
+                  QR code de verificacao
+                </legend>
+                <Marcador
+                  rotulo="Estampar o QR code na ultima pagina"
+                  descricao="Aponta para a pagina publica de verificacao do documento."
+                  marcado={cfg.qrcode_ativo}
+                  onChange={(v) => setConfig("qrcode_ativo", v)}
+                />
+                {!cfg.qrcode_ativo && (
+                  <p className="mt-2 rounded-lg bg-indigo/10 px-3 py-2 text-xs text-navy">
+                    Sem o QR o documento continua verificavel: o hash SHA-256 e
+                    o codigo de autenticidade seguem sendo gerados e aparecem
+                    na listagem e no email. So nao ficam impressos no PDF.
+                  </p>
+                )}
+              </fieldset>
             </>
           )}
 

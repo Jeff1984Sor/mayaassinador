@@ -1,9 +1,9 @@
 """Aplica cabecalho e rodape no .docx com python-docx.
 
-Regra que nao pode ser quebrada: as linhas do cabecalho montadas aqui
-precisam ser IDENTICAS as do preview do frontend
-(`linhasCabecalho` em preview-a4.tsx). Se as duas logicas divergirem, o
-preview passa a mentir — e o preview e o argumento de venda da tela 4.4.
+Regra que nao pode ser quebrada: as linhas montadas aqui precisam ser
+IDENTICAS as do preview do frontend (`linhasEscritorio` em preview-a4.tsx).
+Se as duas logicas divergirem, o preview passa a mentir — e o preview e o
+argumento de venda da tela 4.4.
 """
 
 from pathlib import Path
@@ -25,8 +25,12 @@ ALINHAMENTOS = {
 }
 
 
-def linhas_cabecalho(escritorio: Escritorio | None, campos: dict) -> list[str]:
-    """Espelho de `linhasCabecalho` do frontend. Manter as duas em sincronia."""
+def linhas_escritorio(escritorio: Escritorio | None, campos: dict) -> list[str]:
+    """Espelho de `linhasEscritorio` do frontend. Manter as duas em sincronia.
+
+    Usada tanto pelo cabecalho quanto pelo rodape — os dois escolhem de que
+    campos do escritorio querem, de forma independente.
+    """
     if escritorio is None:
         return []
 
@@ -153,7 +157,8 @@ def aplicar(
 
     tip_cab = dict(config.cabecalho_tipografia or {})
     tip_rod = dict(config.rodape_tipografia or {})
-    linhas = linhas_cabecalho(escritorio, dict(config.cabecalho_campos or {}))
+    linhas = linhas_escritorio(escritorio, dict(config.cabecalho_campos or {}))
+    linhas_rodape = linhas_escritorio(escritorio, dict(config.rodape_campos or {}))
     posicao_logo = config.logo_posicao or "esquerda"
     usar_logo = logo is not None and logo.exists() and posicao_logo != "sem_logo"
 
@@ -205,8 +210,15 @@ def aplicar(
         numerar = bool(config.rodape_numeracao)
         lado = config.rodape_numeracao_alinhamento or "direita"
 
-        if numerar and lado in ("esquerda", "direita") and texto_rodape:
-            # texto e numeracao em lados opostos: tabela de 2 colunas
+        # os dados do escritorio vem primeiro, depois o texto livre
+        conteudo = [*linhas_rodape]
+        if texto_rodape:
+            conteudo.append(texto_rodape)
+
+        uma_linha_so = len(conteudo) == 1
+        if numerar and lado in ("esquerda", "direita") and uma_linha_so:
+            # com uma unica linha da para por texto e numeracao em lados
+            # opostos, na mesma altura: tabela de 2 colunas sem bordas
             tabela = rodape.add_table(rows=1, cols=2, width=secao.page_width)
             _sem_bordas(tabela)
             celula_num, celula_txt = (
@@ -217,16 +229,17 @@ def aplicar(
 
             p_txt = celula_txt.paragraphs[0]
             p_txt.alignment = ALINHAMENTOS.get(tip_rod.get("alinhamento", "centro"))
-            _texto(p_txt, texto_rodape, tip_rod)
+            _texto(p_txt, conteudo[0], tip_rod)
 
             p_num = celula_num.paragraphs[0]
             p_num.alignment = ALINHAMENTOS.get(lado)
             _numeracao(p_num, tip_rod)
         else:
-            if texto_rodape:
+            # varias linhas: empilha e coloca a numeracao na ultima
+            for linha in conteudo:
                 p = rodape.add_paragraph()
                 p.alignment = ALINHAMENTOS.get(tip_rod.get("alinhamento", "centro"))
-                _texto(p, texto_rodape, tip_rod)
+                _texto(p, linha, tip_rod)
             if numerar:
                 p = rodape.add_paragraph()
                 p.alignment = ALINHAMENTOS.get(lado)

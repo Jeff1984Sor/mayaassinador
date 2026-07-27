@@ -54,17 +54,35 @@ class CabecalhoCampos(BaseModel):
     site: bool = False
 
 
+class RodapeCampos(BaseModel):
+    """Mesmos campos do cabecalho, escolhidos de forma independente.
+
+    Padrao tudo desligado: quem ja usava so o texto livre nao ve mudanca.
+    """
+
+    razao_social: bool = False
+    cnpj: bool = False
+    oab: bool = False
+    endereco: bool = False
+    telefone: bool = False
+    whatsapp: bool = False
+    email: bool = False
+    site: bool = False
+
+
 class ConfiguracaoUpdate(BaseModel):
     cabecalho_campos: CabecalhoCampos
     cabecalho_tipografia: Tipografia
     logo_posicao: PosicaoLogo = "esquerda"
 
+    rodape_campos: RodapeCampos = RodapeCampos()
     rodape_texto: str | None = Field(default=None, max_length=2000)
     rodape_tipografia: Tipografia
     rodape_numeracao: bool = True
     rodape_numeracao_alinhamento: Alinhamento = "direita"
 
     rubricar_por_padrao: bool = False
+    qrcode_ativo: bool = True
 
     # ---- SMTP ----
     smtp_host: str | None = Field(default=None, max_length=255)
@@ -86,12 +104,14 @@ class ConfiguracaoOut(BaseModel):
     cabecalho_tipografia: Tipografia
     logo_posicao: PosicaoLogo
 
+    rodape_campos: RodapeCampos
     rodape_texto: str | None
     rodape_tipografia: Tipografia
     rodape_numeracao: bool
     rodape_numeracao_alinhamento: Alinhamento
 
     rubricar_por_padrao: bool
+    qrcode_ativo: bool
     rubrica_url: str | None = None
     assinatura_url: str | None = None
     # 'antes' da comparacao antes/depois do tratamento com Pillow
