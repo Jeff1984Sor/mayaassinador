@@ -83,6 +83,44 @@ const CAMPOS_CABECALHO: { chave: keyof Configuracao["cabecalho_campos"]; rotulo:
   { chave: "site", rotulo: "Site" },
 ];
 
+function Opcao({
+  marcada,
+  titulo,
+  descricao,
+  onClick,
+}: {
+  marcada: boolean;
+  titulo: string;
+  descricao: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition",
+        marcada
+          ? "border-navy bg-navy/5"
+          : "border-dark/10 hover:border-navy/30 hover:bg-cinza",
+      )}
+    >
+      <span
+        className={cn(
+          "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
+          marcada ? "border-navy" : "border-dark/25",
+        )}
+      >
+        {marcada && <span className="h-2 w-2 rounded-full bg-navy" />}
+      </span>
+      <span>
+        <span className="block text-sm font-medium text-dark">{titulo}</span>
+        <span className="block text-xs text-dark/65">{descricao}</span>
+      </span>
+    </button>
+  );
+}
+
 export default function ConfiguracoesPage() {
   const { tenant } = useParams<{ tenant: string }>();
   const qc = useQueryClient();
@@ -147,6 +185,10 @@ export default function ConfiguracoesPage() {
         rodape_numeracao_alinhamento: cfg.rodape_numeracao_alinhamento,
         rubricar_por_padrao: cfg.rubricar_por_padrao,
         qrcode_ativo: cfg.qrcode_ativo,
+        assinatura_modo: cfg.assinatura_modo,
+        assinatura_ancora: cfg.assinatura_ancora,
+        assinatura_relativa: cfg.assinatura_relativa,
+        assinatura_deslocamento: cfg.assinatura_deslocamento,
         smtp_host: cfg.smtp_host,
         smtp_porta: cfg.smtp_porta,
         smtp_usuario: cfg.smtp_usuario,
@@ -295,7 +337,25 @@ export default function ConfiguracoesPage() {
                     setEscritorio("oab_seccional", v.toUpperCase() || null)
                   }
                 />
+                <Campo
+                  rotulo="Signatario - nome"
+                  valor={esc.signatario_nome}
+                  placeholder="Dra. Maria Silva"
+                  onChange={(v) => setEscritorio("signatario_nome", v || null)}
+                />
+                <Campo
+                  rotulo="Signatario - OAB"
+                  valor={esc.signatario_oab}
+                  placeholder="123456/SP"
+                  onChange={(v) => setEscritorio("signatario_oab", v || null)}
+                />
               </div>
+
+              <p className="rounded-lg bg-indigo/10 px-3 py-2 text-xs text-navy">
+                O nome do signatario e quem assina os documentos — e o texto
+                que o sistema procura no PDF para posicionar a assinatura
+                automaticamente (aba Rubrica e Assinatura).
+              </p>
 
               <div className="grid gap-4 sm:grid-cols-6">
                 <Campo
@@ -529,6 +589,85 @@ export default function ConfiguracoesPage() {
                 O fundo branco vira transparente automaticamente. Compare o
                 antes e o depois acima — o xadrez indica transparencia.
               </p>
+
+              <fieldset className="rounded-lg border border-dark/[.08] p-4">
+                <legend className="px-1.5 text-xs font-medium uppercase tracking-wide text-dark/65">
+                  Posicao da assinatura
+                </legend>
+
+                <div className="space-y-2">
+                  <Opcao
+                    marcada={cfg.assinatura_modo === "fixa"}
+                    titulo="Posicao fixa"
+                    descricao="Centralizada no rodape da ultima pagina."
+                    onClick={() => setConfig("assinatura_modo", "fixa")}
+                  />
+                  <Opcao
+                    marcada={cfg.assinatura_modo === "ancora"}
+                    titulo="Junto ao nome do signatario"
+                    descricao="O sistema procura o nome no texto do documento e assina ali."
+                    onClick={() => setConfig("assinatura_modo", "ancora")}
+                  />
+                </div>
+
+                {cfg.assinatura_modo === "ancora" && (
+                  <div className="mt-4 space-y-3 border-t border-dark/[.07] pt-4">
+                    <Campo
+                      rotulo="Texto procurado"
+                      valor={cfg.assinatura_ancora}
+                      placeholder={
+                        esc.signatario_nome ?? "Nome do signatario (aba 1)"
+                      }
+                      onChange={(v) => setConfig("assinatura_ancora", v || null)}
+                    />
+                    <p className="-mt-1.5 text-xs text-dark/65">
+                      Em branco, usa o nome do signatario cadastrado nos Dados
+                      do Escritorio. A busca ignora acentos e maiusculas.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="rotulo">Assinar</label>
+                        <select
+                          className="campo"
+                          value={cfg.assinatura_relativa}
+                          onChange={(e) =>
+                            setConfig(
+                              "assinatura_relativa",
+                              e.target.value as Configuracao["assinatura_relativa"],
+                            )
+                          }
+                        >
+                          <option value="abaixo">Abaixo do nome</option>
+                          <option value="acima">Acima do nome</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="rotulo">Folga (pt)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={200}
+                          className="campo"
+                          value={cfg.assinatura_deslocamento}
+                          onChange={(e) =>
+                            setConfig(
+                              "assinatura_deslocamento",
+                              Number(e.target.value) || 0,
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <p className="rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">
+                      Se o texto nao for encontrado no documento, a assinatura
+                      volta para a posicao fixa e o motivo fica registrado no
+                      historico do documento. Nunca sai PDF sem assinatura.
+                    </p>
+                  </div>
+                )}
+              </fieldset>
 
               <fieldset className="rounded-lg border border-dark/[.08] p-4">
                 <legend className="px-1.5 text-xs font-medium uppercase tracking-wide text-dark/65">

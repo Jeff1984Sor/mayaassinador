@@ -28,6 +28,8 @@ export type Escritorio = {
   cnpj: string | null;
   oab_numero: string | null;
   oab_seccional: string | null;
+  signatario_nome: string | null;
+  signatario_oab: string | null;
   logradouro: string | null;
   numero: string | null;
   complemento: string | null;
@@ -54,6 +56,10 @@ export type Configuracao = {
   rodape_numeracao_alinhamento: Alinhamento;
   rubricar_por_padrao: boolean;
   qrcode_ativo: boolean;
+  assinatura_modo: "fixa" | "ancora";
+  assinatura_ancora: string | null;
+  assinatura_relativa: "acima" | "abaixo";
+  assinatura_deslocamento: number;
   rubrica_url: string | null;
   assinatura_url: string | null;
   rubrica_original_url: string | null;

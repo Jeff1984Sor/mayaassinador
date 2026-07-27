@@ -19,6 +19,11 @@ class EscritorioBase(BaseModel):
     oab_numero: str | None = Field(default=None, max_length=30)
     oab_seccional: str | None = Field(default=None, max_length=2)
 
+    # quem assina — e o nome que o pipeline procura no PDF para ancorar a
+    # imagem da assinatura
+    signatario_nome: str | None = Field(default=None, max_length=200)
+    signatario_oab: str | None = Field(default=None, max_length=30)
+
     logradouro: str | None = Field(default=None, max_length=255)
     numero: str | None = Field(default=None, max_length=20)
     complemento: str | None = Field(default=None, max_length=100)

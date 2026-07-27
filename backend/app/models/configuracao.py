@@ -80,6 +80,18 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     assinatura_path: Mapped[str | None] = mapped_column(String(500))
     rubricar_por_padrao: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # ---- Posicionamento da assinatura ----
+    # "fixa": posicao padrao no rodape da ultima pagina.
+    # "ancora": procura um texto no PDF (por padrao o nome do signatario) e
+    # posiciona a assinatura em relacao a ele.
+    assinatura_modo: Mapped[str] = mapped_column(String(10), default="fixa")
+    # texto procurado; vazio = usa o nome do signatario do escritorio
+    assinatura_ancora: Mapped[str | None] = mapped_column(String(200))
+    # acima | abaixo da linha encontrada
+    assinatura_relativa: Mapped[str] = mapped_column(String(10), default="abaixo")
+    # folga em pontos entre a ancora e a imagem
+    assinatura_deslocamento: Mapped[int] = mapped_column(default=6)
+
     # QR de verificacao na ultima pagina. Opcional: nem todo escritorio quer
     # um QR estampado no documento. Desligado, o hash e o codigo continuam
     # sendo gerados e o documento segue verificavel pela pagina publica.

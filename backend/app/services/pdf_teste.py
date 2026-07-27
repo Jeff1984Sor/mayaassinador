@@ -55,10 +55,19 @@ PETICAO = [
     ("Sao Paulo, na data da assinatura eletronica.", False),
 ]
 
+# marcador do fecho: e aqui que a assinatura ancorada deve cair no teste
+FECHO_PADRAO = "Advogado(a)"
 
-def _docx_exemplo(destino: Path) -> Path:
+
+def _docx_exemplo(destino: Path, signatario: str | None) -> Path:
     doc = Document()
-    for texto, centralizado in PETICAO:
+    # o fecho leva o nome real do signatario para que o modo "ancora" possa
+    # ser testado de verdade no PDF de exemplo
+    conteudo = [
+        *PETICAO,
+        (signatario or FECHO_PADRAO, True),
+    ]
+    for texto, centralizado in conteudo:
         p = doc.add_paragraph()
         p.alignment = (
             WD_ALIGN_PARAGRAPH.CENTER if centralizado else WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -80,7 +89,7 @@ def gerar(config: ConfiguracaoTenant, escritorio: Escritorio | None, slug: str) 
     convertido = pasta / "teste_convertido.pdf"
     final = pasta / "teste.pdf"
 
-    _docx_exemplo(exemplo)
+    _docx_exemplo(exemplo, escritorio.signatario_nome if escritorio else None)
 
     logo = pasta / "logo.png"
     docx_timbre.aplicar(
@@ -112,6 +121,13 @@ def gerar(config: ConfiguracaoTenant, escritorio: Escritorio | None, slug: str) 
             "https://exemplo/verificar/TESTE123" if config.qrcode_ativo else None
         ),
         codigo="TEST-E123" if config.qrcode_ativo else None,
+        posicao=pdf_carimbo.PosicaoAssinatura(
+            modo=config.assinatura_modo or "fixa",
+            texto=(config.assinatura_ancora or "").strip()
+            or (escritorio.signatario_nome if escritorio else None),
+            relativa=config.assinatura_relativa or "abaixo",
+            deslocamento=config.assinatura_deslocamento or 6,
+        ),
     )
 
     for temporario in (exemplo, timbrado, convertido):

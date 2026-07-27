@@ -143,14 +143,24 @@ def processar(db: Session, documento: Documento) -> None:
     rubrica = _imagem(config, "rubrica_path") if documento.rubricado else None
     assinatura = _imagem(config, "assinatura_path")
 
+    posicao = pdf_carimbo.PosicaoAssinatura(
+        modo=config.assinatura_modo or "fixa",
+        # ancora explicita tem prioridade; senao usamos o nome do signatario
+        texto=(config.assinatura_ancora or "").strip()
+        or (escritorio.signatario_nome if escritorio else None),
+        relativa=config.assinatura_relativa or "abaixo",
+        deslocamento=config.assinatura_deslocamento or 6,
+    )
+
     try:
-        paginas = pdf_carimbo.carimbar(
+        paginas, ancorou = pdf_carimbo.carimbar(
             origem=convertido,
             destino=final,
             rubrica=rubrica,
             assinatura=assinatura,
             url_verificacao=url_verificacao,
             codigo=formatar_codigo(codigo) if config.qrcode_ativo else None,
+            posicao=posicao,
         )
     except pdf_carimbo.FalhaCarimbo as exc:
         raise FalhaPipeline(str(exc)) from exc
@@ -158,7 +168,15 @@ def processar(db: Session, documento: Documento) -> None:
     if rubrica:
         registrar_evento(db, documento.id, TipoEvento.RUBRICA_APLICADA, f"{paginas} paginas")
     if assinatura:
-        registrar_evento(db, documento.id, TipoEvento.ASSINATURA_APLICADA)
+        if posicao.modo == "ancora":
+            detalhe = (
+                f'ancorada em "{posicao.texto}"'
+                if ancorou
+                else f'texto "{posicao.texto}" nao encontrado — usada a posicao fixa'
+            )
+        else:
+            detalhe = "posicao fixa"
+        registrar_evento(db, documento.id, TipoEvento.ASSINATURA_APLICADA, detalhe)
 
     # ---- hash do arquivo final ----
     documento.hash_sha256 = calcular_hash(final)

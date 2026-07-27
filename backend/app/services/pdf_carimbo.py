@@ -5,6 +5,7 @@ de cada pagina, e mesclar com pypdf. Assim o conteudo original nunca e
 redesenhado — nenhum risco de perder formatacao.
 """
 
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
@@ -12,6 +13,8 @@ import qrcode
 from pypdf import PdfReader, PdfWriter
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+
+from app.services import ancora_pdf
 
 # medidas em pontos (1pt = 1/72")
 MARGEM = 28
@@ -48,6 +51,48 @@ def _gerar_qr(conteudo: str) -> BytesIO:
     return buffer
 
 
+@dataclass(frozen=True)
+class PosicaoAssinatura:
+    """Onde carimbar a assinatura.
+
+    modo "ancora": procura `texto` no PDF e posiciona `relativa` (acima ou
+    abaixo) da linha encontrada, com `deslocamento` de folga. Se o texto nao
+    for encontrado, cai na posicao fixa — nunca sai documento sem assinatura.
+    """
+
+    modo: str = "fixa"
+    texto: str | None = None
+    relativa: str = "abaixo"
+    deslocamento: int = 6
+
+
+def _coordenada_assinatura(
+    pagina,
+    posicao: PosicaoAssinatura,
+    largura_pagina: float,
+    largura_img: float,
+    altura_img: float,
+) -> tuple[float, float, bool]:
+    """Devolve (x, y, ancorou)."""
+    if posicao.modo == "ancora" and posicao.texto:
+        ancora = ancora_pdf.localizar(pagina, posicao.texto)
+        if ancora is not None:
+            if posicao.relativa == "acima":
+                y = ancora.y + ancora.altura + posicao.deslocamento
+            else:
+                y = ancora.y - posicao.deslocamento - altura_img
+
+            # alinha o centro da imagem com o inicio da linha encontrada,
+            # que e onde o nome comeca a ser escrito
+            x = ancora.x
+            # nao deixa vazar da pagina
+            x = max(MARGEM, min(x, largura_pagina - MARGEM - largura_img))
+            y = max(MARGEM, y)
+            return x, y, True
+
+    return (largura_pagina - largura_img) / 2, MARGEM + 46, False
+
+
 def _overlay(
     largura: float,
     altura: float,
@@ -55,6 +100,7 @@ def _overlay(
     assinatura: Path | None,
     qr_buffer: BytesIO | None,
     codigo: str | None,
+    coordenada_assinatura: tuple[float, float] | None = None,
 ) -> BytesIO:
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(largura, altura))
@@ -74,13 +120,9 @@ def _overlay(
         w, h = _dimensoes_proporcionais(
             assinatura, ASSINATURA_ALTURA, ASSINATURA_LARGURA_MAX
         )
+        x, y = coordenada_assinatura or ((largura - w) / 2, MARGEM + 46)
         c.drawImage(
-            ImageReader(str(assinatura)),
-            (largura - w) / 2,
-            MARGEM + 46,
-            width=w,
-            height=h,
-            mask="auto",
+            ImageReader(str(assinatura)), x, y, width=w, height=h, mask="auto"
         )
 
     if qr_buffer and codigo:
@@ -105,8 +147,9 @@ def carimbar(
     assinatura: Path | None,
     url_verificacao: str | None,
     codigo: str | None,
-) -> int:
-    """Aplica os carimbos e devolve o numero de paginas.
+    posicao: PosicaoAssinatura | None = None,
+) -> tuple[int, bool]:
+    """Aplica os carimbos e devolve (numero de paginas, assinatura ancorada).
 
     - rubrica: em TODAS as paginas (quando informada)
     - assinatura + QR: apenas na ultima
@@ -122,11 +165,22 @@ def carimbar(
 
     qr_buffer = _gerar_qr(url_verificacao) if url_verificacao and codigo else None
     escritor = PdfWriter()
+    ancorou = False
 
     for indice, pagina in enumerate(leitor.pages):
         ultima = indice == total - 1
         largura = float(pagina.mediabox.width)
         altura = float(pagina.mediabox.height)
+
+        coordenada = None
+        if ultima and assinatura and posicao:
+            w, h = _dimensoes_proporcionais(
+                assinatura, ASSINATURA_ALTURA, ASSINATURA_LARGURA_MAX
+            )
+            # a busca da ancora acontece ANTES do merge: depois o overlay ja
+            # teria alterado o conteudo de texto da pagina
+            x, y, ancorou = _coordenada_assinatura(pagina, posicao, largura, w, h)
+            coordenada = (x, y)
 
         precisa_overlay = bool(rubrica) or (ultima and (assinatura or qr_buffer))
         if precisa_overlay:
@@ -139,6 +193,7 @@ def carimbar(
                 assinatura if ultima else None,
                 qr_buffer if ultima else None,
                 codigo if ultima else None,
+                coordenada,
             )
             pagina.merge_page(PdfReader(camada).pages[0])
 
@@ -148,4 +203,4 @@ def carimbar(
     with destino.open("wb") as f:
         escritor.write(f)
 
-    return total
+    return total, ancorou

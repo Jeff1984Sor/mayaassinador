@@ -84,6 +84,12 @@ class ConfiguracaoUpdate(BaseModel):
     rubricar_por_padrao: bool = False
     qrcode_ativo: bool = True
 
+    # ---- Posicao da assinatura ----
+    assinatura_modo: Literal["fixa", "ancora"] = "fixa"
+    assinatura_ancora: str | None = Field(default=None, max_length=200)
+    assinatura_relativa: Literal["acima", "abaixo"] = "abaixo"
+    assinatura_deslocamento: int = Field(default=6, ge=0, le=200)
+
     # ---- SMTP ----
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_porta: int | None = Field(default=None, ge=1, le=65535)
@@ -112,6 +118,10 @@ class ConfiguracaoOut(BaseModel):
 
     rubricar_por_padrao: bool
     qrcode_ativo: bool
+    assinatura_modo: Literal["fixa", "ancora"]
+    assinatura_ancora: str | None
+    assinatura_relativa: Literal["acima", "abaixo"]
+    assinatura_deslocamento: int
     rubrica_url: str | None = None
     assinatura_url: str | None = None
     # 'antes' da comparacao antes/depois do tratamento com Pillow

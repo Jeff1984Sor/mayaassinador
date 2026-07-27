@@ -30,6 +30,12 @@ class Escritorio(Base, TimestampMixin):
     oab_numero: Mapped[str | None] = mapped_column(String(30))
     oab_seccional: Mapped[str | None] = mapped_column(String(2))
 
+    # Quem assina os documentos. Separado da razao social porque quem assina
+    # e a pessoa (o advogado), nao a pessoa juridica — e e este nome que o
+    # pipeline procura no PDF para ancorar a imagem da assinatura.
+    signatario_nome: Mapped[str | None] = mapped_column(String(200))
+    signatario_oab: Mapped[str | None] = mapped_column(String(30))
+
     logradouro: Mapped[str | None] = mapped_column(String(255))
     numero: Mapped[str | None] = mapped_column(String(20))
     complemento: Mapped[str | None] = mapped_column(String(100))

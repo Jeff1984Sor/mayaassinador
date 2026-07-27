@@ -322,11 +322,16 @@ export function PreviewA4({
                   fontSize: "10pt",
                 }}
               >
-                {escritorio?.razao_social ?? "Nome do signatario"}
-                {escritorio?.oab_numero && (
+                {escritorio?.signatario_nome ||
+                  escritorio?.razao_social ||
+                  "Nome do signatario"}
+                {(escritorio?.signatario_oab || escritorio?.oab_numero) && (
                   <div style={{ fontSize: "9pt", color: "#555" }}>
-                    OAB {escritorio.oab_numero}
-                    {escritorio.oab_seccional ? `/${escritorio.oab_seccional}` : ""}
+                    OAB{" "}
+                    {escritorio.signatario_oab ??
+                      `${escritorio.oab_numero}${
+                        escritorio.oab_seccional ? `/${escritorio.oab_seccional}` : ""
+                      }`}
                   </div>
                 )}
               </div>
