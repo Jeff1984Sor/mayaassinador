@@ -371,8 +371,8 @@ export function PreviewA4({
             </div>
           )}
 
-          {/* rubrica: canto inferior direito de todas as paginas */}
-          {rubricaSrc && (
+          {/* rubrica: paginas sem assinatura, ou seja, todas menos a ultima */}
+          {rubricaSrc && !ehUltima && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={rubricaSrc}

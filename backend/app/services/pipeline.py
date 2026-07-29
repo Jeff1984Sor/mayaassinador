@@ -166,7 +166,13 @@ def processar(db: Session, documento: Documento) -> None:
         raise FalhaPipeline(str(exc)) from exc
 
     if rubrica:
-        registrar_evento(db, documento.id, TipoEvento.RUBRICA_APLICADA, f"{paginas} paginas")
+        rubricadas = max(0, paginas - 1)  # a ultima pagina leva a assinatura
+        detalhe_rubrica = (
+            f"{rubricadas} de {paginas} paginas"
+            if rubricadas
+            else "documento de 1 pagina — sem rubrica, apenas assinatura"
+        )
+        registrar_evento(db, documento.id, TipoEvento.RUBRICA_APLICADA, detalhe_rubrica)
     if assinatura:
         if posicao.modo == "ancora":
             detalhe = (

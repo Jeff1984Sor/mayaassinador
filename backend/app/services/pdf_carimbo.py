@@ -151,8 +151,9 @@ def carimbar(
 ) -> tuple[int, bool]:
     """Aplica os carimbos e devolve (numero de paginas, assinatura ancorada).
 
-    - rubrica: em TODAS as paginas (quando informada)
-    - assinatura + QR: apenas na ultima
+    - rubrica: em todas as paginas MENOS a ultima. Num documento de uma
+      pagina so, nenhuma pagina e rubricada — vale a assinatura.
+    - assinatura + QR: sempre e apenas na ultima pagina.
     """
     try:
         leitor = PdfReader(str(origem))
@@ -182,14 +183,19 @@ def carimbar(
             x, y, ancorou = _coordenada_assinatura(pagina, posicao, largura, w, h)
             coordenada = (x, y)
 
-        precisa_overlay = bool(rubrica) or (ultima and (assinatura or qr_buffer))
+        # A rubrica vale para as paginas SEM assinatura. Na ultima pagina
+        # entra a assinatura, entao ali nao ha rubrica. Documento de uma
+        # pagina so tem assinatura — nao existe pagina intermediaria.
+        rubrica_aqui = rubrica if (rubrica and not ultima) else None
+
+        precisa_overlay = bool(rubrica_aqui) or (ultima and (assinatura or qr_buffer))
         if precisa_overlay:
             if qr_buffer:
                 qr_buffer.seek(0)
             camada = _overlay(
                 largura,
                 altura,
-                rubrica,
+                rubrica_aqui,
                 assinatura if ultima else None,
                 qr_buffer if ultima else None,
                 codigo if ultima else None,

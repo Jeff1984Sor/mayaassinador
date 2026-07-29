@@ -186,11 +186,10 @@ export function ModalUpload({
                   className="mt-0.5 h-4 w-4 accent-navy"
                 />
                 <span>
-                  <span className="text-sm text-dark/95">
-                    Rubricar todas as paginas
-                  </span>
+                  <span className="text-sm text-dark/95">Rubricar o documento</span>
                   <span className="block text-xs text-dark/65">
-                    Carimba a rubrica cadastrada no canto de cada pagina.
+                    Carimba a rubrica da primeira ate a penultima pagina. A
+                    ultima leva a assinatura.
                   </span>
                 </span>
               </label>

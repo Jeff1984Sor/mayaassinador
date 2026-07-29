@@ -584,7 +584,7 @@ export default function ConfiguracoesPage() {
             <>
               <UploadImagem
                 titulo="Rubrica"
-                descricao="Carimbada no canto de todas as paginas quando ativada."
+                descricao="Carimbada nas paginas sem assinatura — todas menos a ultima."
                 url={urlArquivo(cfg.rubrica_url)}
                 urlOriginal={urlArquivo(cfg.rubrica_original_url)}
                 endpoint={`/api/${tenant}/configuracoes/imagens/rubrica`}
@@ -592,11 +592,17 @@ export default function ConfiguracoesPage() {
               />
 
               <Marcador
-                rotulo="Rubricar todas as paginas por padrao"
+                rotulo="Rubricar por padrao"
                 descricao="Valor inicial do toggle na hora do upload."
                 marcado={cfg.rubricar_por_padrao}
                 onChange={(v) => setConfig("rubricar_por_padrao", v)}
               />
+
+              <p className="rounded-lg bg-indigo/10 px-3 py-2 text-xs text-navy">
+                A rubrica vai nas paginas que nao tem assinatura: da primeira
+                ate a penultima. A ultima pagina leva so a assinatura. Documento
+                de uma pagina nao e rubricado.
+              </p>
 
               <UploadImagem
                 titulo="Assinatura"
