@@ -8,7 +8,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from app.models.configuracao import FONTES_DISPONIVEIS
 
 Alinhamento = Literal["esquerda", "centro", "direita"]
-PosicaoLogo = Literal["esquerda", "direita", "acima", "sem_logo"]
+# "acima": logo centralizado, texto mantem o alinhamento da tipografia
+# "centro": logo e texto centralizados juntos (papel timbrado classico)
+PosicaoLogo = Literal["esquerda", "direita", "acima", "centro", "sem_logo"]
 
 
 class Tipografia(BaseModel):
@@ -80,6 +82,7 @@ class ConfiguracaoUpdate(BaseModel):
     rodape_tipografia: Tipografia
     rodape_numeracao: bool = True
     rodape_numeracao_alinhamento: Alinhamento = "direita"
+    numeracao_local: Literal["rodape", "cabecalho"] = "rodape"
 
     rubricar_por_padrao: bool = False
     qrcode_ativo: bool = True
@@ -115,6 +118,7 @@ class ConfiguracaoOut(BaseModel):
     rodape_tipografia: Tipografia
     rodape_numeracao: bool
     rodape_numeracao_alinhamento: Alinhamento
+    numeracao_local: Literal["rodape", "cabecalho"]
 
     rubricar_por_padrao: bool
     qrcode_ativo: bool

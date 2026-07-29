@@ -183,6 +183,7 @@ export default function ConfiguracoesPage() {
         rodape_tipografia: cfg.rodape_tipografia,
         rodape_numeracao: cfg.rodape_numeracao,
         rodape_numeracao_alinhamento: cfg.rodape_numeracao_alinhamento,
+        numeracao_local: cfg.numeracao_local,
         rubricar_por_padrao: cfg.rubricar_por_padrao,
         qrcode_ativo: cfg.qrcode_ativo,
         assinatura_modo: cfg.assinatura_modo,
@@ -472,6 +473,9 @@ export default function ConfiguracoesPage() {
                   <option value="esquerda">A esquerda do texto</option>
                   <option value="direita">A direita do texto</option>
                   <option value="acima">Acima do texto</option>
+                  <option value="centro">
+                    Centralizado (logo e texto centrados)
+                  </option>
                   <option value="sem_logo">Sem logo</option>
                 </select>
               </div>
@@ -530,22 +534,40 @@ export default function ConfiguracoesPage() {
               />
 
               {cfg.rodape_numeracao && (
-                <div>
-                  <label className="rotulo">Posicao da numeracao</label>
-                  <select
-                    className="campo"
-                    value={cfg.rodape_numeracao_alinhamento}
-                    onChange={(e) =>
-                      setConfig(
-                        "rodape_numeracao_alinhamento",
-                        e.target.value as Configuracao["rodape_numeracao_alinhamento"],
-                      )
-                    }
-                  >
-                    <option value="esquerda">Esquerda</option>
-                    <option value="centro">Centro</option>
-                    <option value="direita">Direita</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="rotulo">Onde</label>
+                    <select
+                      className="campo"
+                      value={cfg.numeracao_local}
+                      onChange={(e) =>
+                        setConfig(
+                          "numeracao_local",
+                          e.target.value as Configuracao["numeracao_local"],
+                        )
+                      }
+                    >
+                      <option value="rodape">No rodape</option>
+                      <option value="cabecalho">No cabecalho (topo)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="rotulo">Alinhamento</label>
+                    <select
+                      className="campo"
+                      value={cfg.rodape_numeracao_alinhamento}
+                      onChange={(e) =>
+                        setConfig(
+                          "rodape_numeracao_alinhamento",
+                          e.target.value as Configuracao["rodape_numeracao_alinhamento"],
+                        )
+                      }
+                    >
+                      <option value="esquerda">Esquerda</option>
+                      <option value="centro">Centro</option>
+                      <option value="direita">Direita</option>
+                    </select>
+                  </div>
                 </div>
               )}
 

@@ -162,11 +162,21 @@ def aplicar(
     posicao_logo = config.logo_posicao or "esquerda"
     usar_logo = logo is not None and logo.exists() and posicao_logo != "sem_logo"
 
+    numerar = bool(config.rodape_numeracao)
+    lado_num = config.rodape_numeracao_alinhamento or "direita"
+    numerar_no_cabecalho = numerar and (config.numeracao_local or "rodape") == "cabecalho"
+
     for secao in doc.sections:
         # ---------------- cabecalho ----------------
         cabecalho = secao.header
         cabecalho.is_linked_to_previous = False
         _limpar(cabecalho)
+
+        if numerar_no_cabecalho:
+            # numeracao antes do timbre, na primeira linha do cabecalho
+            p = cabecalho.add_paragraph()
+            p.alignment = ALINHAMENTOS.get(lado_num)
+            _numeracao(p, tip_rod)
 
         if usar_logo and posicao_logo in ("esquerda", "direita"):
             tabela = cabecalho.add_table(rows=1, cols=2, width=secao.page_width)
@@ -191,14 +201,21 @@ def aplicar(
                 _texto(p, linha, tip_cab, negrito=True if primeiro else None)
                 primeiro = False
         else:
-            if usar_logo and posicao_logo == "acima":
+            if usar_logo and posicao_logo in ("acima", "centro"):
                 p = cabecalho.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 p.add_run().add_picture(str(logo), height=Pt(34))
 
+            # em "centro" o texto acompanha o logo, ignorando o alinhamento
+            # escolhido na tipografia — e o que faz o bloco parecer timbrado
+            alinhamento_texto = (
+                WD_ALIGN_PARAGRAPH.CENTER
+                if posicao_logo == "centro"
+                else ALINHAMENTOS.get(tip_cab.get("alinhamento", "centro"))
+            )
             for i, linha in enumerate(linhas):
                 p = cabecalho.add_paragraph()
-                p.alignment = ALINHAMENTOS.get(tip_cab.get("alinhamento", "centro"))
+                p.alignment = alinhamento_texto
                 _texto(p, linha, tip_cab, negrito=True if i == 0 else None)
 
         # ---------------- rodape ----------------
@@ -207,8 +224,9 @@ def aplicar(
         _limpar(rodape)
 
         texto_rodape = (config.rodape_texto or "").strip()
-        numerar = bool(config.rodape_numeracao)
-        lado = config.rodape_numeracao_alinhamento or "direita"
+        # se a numeracao subiu para o cabecalho, o rodape nao a repete
+        numerar_aqui = numerar and not numerar_no_cabecalho
+        lado = lado_num
 
         # os dados do escritorio vem primeiro, depois o texto livre
         conteudo = [*linhas_rodape]
@@ -216,7 +234,7 @@ def aplicar(
             conteudo.append(texto_rodape)
 
         uma_linha_so = len(conteudo) == 1
-        if numerar and lado in ("esquerda", "direita") and uma_linha_so:
+        if numerar_aqui and lado in ("esquerda", "direita") and uma_linha_so:
             # com uma unica linha da para por texto e numeracao em lados
             # opostos, na mesma altura: tabela de 2 colunas sem bordas
             tabela = rodape.add_table(rows=1, cols=2, width=secao.page_width)
@@ -240,7 +258,7 @@ def aplicar(
                 p = rodape.add_paragraph()
                 p.alignment = ALINHAMENTOS.get(tip_rod.get("alinhamento", "centro"))
                 _texto(p, linha, tip_rod)
-            if numerar:
+            if numerar_aqui:
                 p = rodape.add_paragraph()
                 p.alignment = ALINHAMENTOS.get(lado)
                 _numeracao(p, tip_rod)

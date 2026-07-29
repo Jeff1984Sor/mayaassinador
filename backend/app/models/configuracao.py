@@ -74,6 +74,8 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     rodape_numeracao: Mapped[bool] = mapped_column(Boolean, default=True)
     # alinhamento da numeracao, independente do texto do rodape
     rodape_numeracao_alinhamento: Mapped[str] = mapped_column(String(20), default="direita")
+    # onde a numeracao aparece: "rodape" ou "cabecalho"
+    numeracao_local: Mapped[str] = mapped_column(String(10), default="rodape")
 
     # ---- Imagens (caminhos relativos ao STORAGE_ROOT) ----
     rubrica_path: Mapped[str | None] = mapped_column(String(500))

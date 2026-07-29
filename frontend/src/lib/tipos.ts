@@ -1,5 +1,10 @@
 export type Alinhamento = "esquerda" | "centro" | "direita";
-export type PosicaoLogo = "esquerda" | "direita" | "acima" | "sem_logo";
+export type PosicaoLogo =
+  | "esquerda"
+  | "direita"
+  | "acima"
+  | "centro"
+  | "sem_logo";
 
 export type Tipografia = {
   fonte: string;
@@ -54,6 +59,7 @@ export type Configuracao = {
   rodape_tipografia: Tipografia;
   rodape_numeracao: boolean;
   rodape_numeracao_alinhamento: Alinhamento;
+  numeracao_local: "rodape" | "cabecalho";
   rubricar_por_padrao: boolean;
   qrcode_ativo: boolean;
   assinatura_modo: "fixa" | "ancora";

@@ -77,18 +77,24 @@ function Cabecalho({
   config,
   escritorio,
   logoSrc,
+  numeracao,
 }: {
   config: Configuracao;
   escritorio?: Escritorio;
   logoSrc: string | null;
+  numeracao?: React.ReactNode;
 }) {
   const linhas = linhasEscritorio(escritorio, config.cabecalho_campos);
   const t = config.cabecalho_tipografia;
   const pos = config.logo_posicao;
   const temLogo = pos !== "sem_logo" && !!logoSrc;
 
+  // em "centro" o texto acompanha o logo, ignorando o alinhamento da tipografia
+  const alinhamentoTexto =
+    pos === "centro" ? "center" : ALINHA_CSS[t.alinhamento];
+
   const texto = (
-    <div style={{ ...estilo(t), flex: 1 }}>
+    <div style={{ ...estilo(t), textAlign: alinhamentoTexto, flex: 1 }}>
       {linhas.length ? (
         linhas.map((l, i) => (
           <div key={i} style={{ fontWeight: i === 0 ? 700 : undefined }}>
@@ -112,29 +118,37 @@ function Cabecalho({
     />
   ) : null;
 
+  const empilhado = pos === "acima" || pos === "centro";
+
   return (
     <div
       style={{
         borderBottom: "0.75pt solid rgba(15,23,41,.25)",
         paddingBottom: 8,
         marginBottom: 14,
-        display: "flex",
-        flexDirection: pos === "acima" ? "column" : "row",
-        alignItems: pos === "acima" ? "center" : "center",
-        gap: 12,
       }}
     >
-      {pos === "direita" ? (
-        <>
-          {texto}
-          {logo}
-        </>
-      ) : (
-        <>
-          {logo}
-          {texto}
-        </>
-      )}
+      {numeracao}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: empilhado ? "column" : "row",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        {pos === "direita" ? (
+          <>
+            {texto}
+            {logo}
+          </>
+        ) : (
+          <>
+            {logo}
+            {texto}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -159,11 +173,13 @@ function Rodape({
     ...(config.rodape_texto ? [config.rodape_texto] : []),
   ];
 
-  const numeracao = config.rodape_numeracao ? (
-    <span style={{ whiteSpace: "nowrap" }}>
-      Pagina {pagina} de {total}
-    </span>
-  ) : null;
+  // se a numeracao subiu para o cabecalho, o rodape nao a repete
+  const numeracao =
+    config.rodape_numeracao && config.numeracao_local !== "cabecalho" ? (
+      <span style={{ whiteSpace: "nowrap" }}>
+        Pagina {pagina} de {total}
+      </span>
+    ) : null;
 
   const base: React.CSSProperties = {
     ...estilo(t),
@@ -262,7 +278,24 @@ export function PreviewA4({
       }}
     >
       <Pagina escala={escala}>
-        <Cabecalho config={config} escritorio={escritorio} logoSrc={logoSrc} />
+        <Cabecalho
+          config={config}
+          escritorio={escritorio}
+          logoSrc={logoSrc}
+          numeracao={
+            config.rodape_numeracao && config.numeracao_local === "cabecalho" ? (
+              <div
+                style={{
+                  ...estilo(config.rodape_tipografia),
+                  textAlign: ALINHA_CSS[config.rodape_numeracao_alinhamento],
+                  marginBottom: 4,
+                }}
+              >
+                Pagina {ehUltima ? 4 : 1} de 4
+              </div>
+            ) : null
+          }
+        />
 
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <div
