@@ -20,8 +20,8 @@ from app.services import ancora_pdf
 MARGEM = 28
 RUBRICA_ALTURA = 26
 RUBRICA_LARGURA_MAX = 90
-ASSINATURA_ALTURA = 58
-ASSINATURA_LARGURA_MAX = 200
+ASSINATURA_ALTURA = 84
+ASSINATURA_LARGURA_MAX = 290
 QR_LADO = 42
 
 
@@ -66,31 +66,63 @@ class PosicaoAssinatura:
     deslocamento: int = 6
 
 
-def _coordenada_assinatura(
-    pagina,
+def _coordenada_da_ancora(
+    ancora: ancora_pdf.Ancora,
     posicao: PosicaoAssinatura,
     largura_pagina: float,
     largura_img: float,
     altura_img: float,
-) -> tuple[float, float, bool]:
-    """Devolve (x, y, ancorou)."""
-    if posicao.modo == "ancora" and posicao.texto:
-        ancora = ancora_pdf.localizar(pagina, posicao.texto)
-        if ancora is not None:
-            if posicao.relativa == "acima":
-                y = ancora.y + ancora.altura + posicao.deslocamento
-            else:
-                y = ancora.y - posicao.deslocamento - altura_img
+) -> tuple[float, float]:
+    if posicao.relativa == "acima":
+        y = ancora.y + ancora.altura + posicao.deslocamento
+    else:
+        y = ancora.y - posicao.deslocamento - altura_img
 
-            # alinha o centro da imagem com o inicio da linha encontrada,
-            # que e onde o nome comeca a ser escrito
-            x = ancora.x
-            # nao deixa vazar da pagina
-            x = max(MARGEM, min(x, largura_pagina - MARGEM - largura_img))
-            y = max(MARGEM, y)
-            return x, y, True
+    # alinha o inicio da imagem com o inicio da linha encontrada, que e
+    # onde o nome comeca a ser escrito
+    x = ancora.x
+    # nao deixa vazar da pagina
+    x = max(MARGEM, min(x, largura_pagina - MARGEM - largura_img))
+    y = max(MARGEM, y)
+    return x, y
 
-    return (largura_pagina - largura_img) / 2, MARGEM + 46, False
+
+def _localizar_pagina_assinatura(
+    leitor: PdfReader,
+    posicao: PosicaoAssinatura | None,
+    largura_img: float,
+    altura_img: float,
+) -> tuple[int, tuple[float, float] | None, bool]:
+    """Descobre em que pagina a assinatura entra e onde, nessa pagina.
+
+    Varre de tras para frente porque o fecho da peca esta no fim do
+    documento — mas a ultima pagina nem sempre e a do fecho: uma quebra de
+    pagina ou um paragrafo orfao pode deixar uma pagina depois dele, e a
+    assinatura nao pode ficar sozinha nessa pagina, longe do nome.
+
+    Devolve (indice da pagina, coordenada ou None, ancorou).
+    """
+    total = len(leitor.pages)
+
+    if posicao and posicao.modo == "ancora" and posicao.texto:
+        for indice in range(total - 1, -1, -1):
+            pagina = leitor.pages[indice]
+            ancora = ancora_pdf.localizar(pagina, posicao.texto)
+            if ancora is not None:
+                coordenada = _coordenada_da_ancora(
+                    ancora,
+                    posicao,
+                    float(pagina.mediabox.width),
+                    largura_img,
+                    altura_img,
+                )
+                return indice, coordenada, True
+
+    # sem ancora (ou texto nao encontrado): posicao fixa na ultima pagina —
+    # nunca sai documento sem assinatura
+    ultima = leitor.pages[total - 1]
+    largura = float(ultima.mediabox.width)
+    return total - 1, ((largura - largura_img) / 2, MARGEM + 46), False
 
 
 def _overlay(
@@ -151,9 +183,11 @@ def carimbar(
 ) -> tuple[int, bool]:
     """Aplica os carimbos e devolve (numero de paginas, assinatura ancorada).
 
-    - rubrica: em todas as paginas MENOS a ultima. Num documento de uma
-      pagina so, nenhuma pagina e rubricada — vale a assinatura.
-    - assinatura + QR: sempre e apenas na ultima pagina.
+    - assinatura: na pagina onde a ancora foi encontrada (procurada de tras
+      para frente). Sem ancora, na ultima pagina, em posicao fixa.
+    - rubrica: em todas as paginas MENOS a da assinatura. Num documento de
+      uma pagina so, nenhuma pagina e rubricada — vale a assinatura.
+    - QR: sempre e apenas na ultima pagina.
     """
     try:
         leitor = PdfReader(str(origem))
@@ -167,28 +201,31 @@ def carimbar(
     qr_buffer = _gerar_qr(url_verificacao) if url_verificacao and codigo else None
     escritor = PdfWriter()
     ancorou = False
+    indice_assinatura = total - 1
+    coordenada = None
+
+    # A busca da ancora acontece ANTES de qualquer merge: depois o overlay
+    # ja teria alterado o conteudo de texto das paginas.
+    if assinatura:
+        w, h = _dimensoes_proporcionais(
+            assinatura, ASSINATURA_ALTURA, ASSINATURA_LARGURA_MAX
+        )
+        indice_assinatura, coordenada, ancorou = _localizar_pagina_assinatura(
+            leitor, posicao, w, h
+        )
 
     for indice, pagina in enumerate(leitor.pages):
         ultima = indice == total - 1
+        assina_aqui = bool(assinatura) and indice == indice_assinatura
         largura = float(pagina.mediabox.width)
         altura = float(pagina.mediabox.height)
 
-        coordenada = None
-        if ultima and assinatura and posicao:
-            w, h = _dimensoes_proporcionais(
-                assinatura, ASSINATURA_ALTURA, ASSINATURA_LARGURA_MAX
-            )
-            # a busca da ancora acontece ANTES do merge: depois o overlay ja
-            # teria alterado o conteudo de texto da pagina
-            x, y, ancorou = _coordenada_assinatura(pagina, posicao, largura, w, h)
-            coordenada = (x, y)
-
-        # A rubrica vale para as paginas SEM assinatura. Na ultima pagina
-        # entra a assinatura, entao ali nao ha rubrica. Documento de uma
+        # A rubrica vale para as paginas SEM assinatura. Documento de uma
         # pagina so tem assinatura — nao existe pagina intermediaria.
-        rubrica_aqui = rubrica if (rubrica and not ultima) else None
+        sem_assinatura = not assinatura and ultima
+        rubrica_aqui = rubrica if (rubrica and not assina_aqui and not sem_assinatura) else None
 
-        precisa_overlay = bool(rubrica_aqui) or (ultima and (assinatura or qr_buffer))
+        precisa_overlay = bool(rubrica_aqui) or assina_aqui or (ultima and qr_buffer)
         if precisa_overlay:
             if qr_buffer:
                 qr_buffer.seek(0)
@@ -196,10 +233,10 @@ def carimbar(
                 largura,
                 altura,
                 rubrica_aqui,
-                assinatura if ultima else None,
+                assinatura if assina_aqui else None,
                 qr_buffer if ultima else None,
                 codigo if ultima else None,
-                coordenada,
+                coordenada if assina_aqui else None,
             )
             pagina.merge_page(PdfReader(camada).pages[0])
 

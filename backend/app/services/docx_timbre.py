@@ -18,6 +18,9 @@ from docx.text.paragraph import Paragraph
 
 from app.models import ConfiguracaoTenant, Escritorio
 
+# cinza do fio do rodape: equivale ao rgba(15,23,41,.2) do preview sobre branco
+SEPARADOR_COR = "CFD2D8"
+
 ALINHAMENTOS = {
     "esquerda": WD_ALIGN_PARAGRAPH.LEFT,
     "centro": WD_ALIGN_PARAGRAPH.CENTER,
@@ -142,6 +145,35 @@ def _sem_bordas(tabela) -> None:
     tbl_pr.append(borders)
 
 
+def _separador(container) -> None:
+    """Fio horizontal acima do rodape, com respiro em cima e embaixo.
+
+    Espelha o `borderTop` do preview (`preview-a4.tsx`): 0.75pt — no OOXML a
+    espessura vem em oitavos de ponto, logo `w:sz=6`. E um paragrafo vazio de
+    fonte minima cuja borda inferior desenha o fio; assim a linha nasce
+    colada no topo do bloco de texto, sem depender de tabela nem de shape.
+    """
+    p = container.add_paragraph()
+    p.paragraph_format.space_before = Pt(10)
+    p.paragraph_format.space_after = Pt(7)
+    p.paragraph_format.line_spacing = Pt(1)
+
+    p_pr = p._element.get_or_add_pPr()
+    bordas = OxmlElement("w:pBdr")
+    fio = OxmlElement("w:bottom")
+    fio.set(qn("w:val"), "single")
+    fio.set(qn("w:sz"), "6")
+    fio.set(qn("w:space"), "0")
+    fio.set(qn("w:color"), SEPARADOR_COR)
+    bordas.append(fio)
+    p_pr.append(bordas)
+
+    # o paragrafo nao tem texto; a fonte de 1pt evita que ele empurre o
+    # rodape para dentro da area util da pagina
+    run = p.add_run()
+    run.font.size = Pt(1)
+
+
 def aplicar(
     origem: Path,
     destino: Path,
@@ -232,6 +264,11 @@ def aplicar(
         conteudo = [*linhas_rodape]
         if texto_rodape:
             conteudo.append(texto_rodape)
+
+        # rodape vazio nao ganha fio: uma linha solta no pe da pagina, sem
+        # nada embaixo, so sujaria o documento
+        if conteudo or numerar_aqui:
+            _separador(rodape)
 
         uma_linha_so = len(conteudo) == 1
         if numerar_aqui and lado in ("esquerda", "direita") and uma_linha_so:

@@ -184,7 +184,9 @@ function Rodape({
   const base: React.CSSProperties = {
     ...estilo(t),
     borderTop: "0.75pt solid rgba(15,23,41,.2)",
-    paddingTop: 6,
+    // mesmos respiros do `_separador` no docx_timbre: 10pt em cima, 7 embaixo
+    marginTop: 10,
+    paddingTop: 7,
   };
 
   // com uma linha so, texto e numeracao dividem a mesma altura
