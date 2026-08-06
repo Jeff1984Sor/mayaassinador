@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 
@@ -14,6 +14,7 @@ from app.models.configuracao import FONTES_DISPONIVEIS
 from app.schemas.configuracao import (
     ConfiguracaoOut,
     ConfiguracaoUpdate,
+    EdicaoImagem,
     EmailTesteRequest,
     FonteOut,
     UploadOut,
@@ -121,10 +122,14 @@ async def enviar_imagem(
 
     try:
         imagens.salvar_original(conteudo, original)
+        # a tolerancia escolhida antes continua valendo, mas recorte e rotacao
+        # nao: eram coordenadas da imagem antiga e nao querem dizer nada nesta
         imagens.remover_fundo(conteudo, tratada, tolerancia)
     except imagens.ImagemInvalida as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
+    setattr(obj, f"{tipo}_rotacao", 0)
+    setattr(obj, f"{tipo}_recorte", None)
     setattr(obj, f"{tipo}_path", para_relativo(tratada))
     db.commit()
 
@@ -141,15 +146,15 @@ async def enviar_imagem(
 @router.post("/imagens/{tipo}/reprocessar", response_model=UploadOut)
 def reprocessar_imagem(
     tipo: TipoImagem,
+    edicao: EdicaoImagem,
     tenant: TenantAtual,
     db: DbSession,
     _: UsuarioAtual,
-    tolerancia: Annotated[int, Query(ge=0, le=imagens.TOLERANCIA_MAXIMA)],
 ) -> UploadOut:
-    """Refaz a remocao de fundo com outra tolerancia, sem novo upload.
+    """Reaplica recorte, rotacao e remocao de fundo, sem novo upload.
 
-    E o que sustenta o slider da tela: cada ajuste parte do original guardado,
-    entao da para ir e voltar a vontade sem degradar a imagem.
+    E o que sustenta o editor da tela: cada ajuste parte do original
+    guardado, entao da para ir e voltar a vontade sem degradar a imagem.
     """
     obj = _buscar(db, tenant.id)
     if not getattr(obj, f"{tipo}_path"):
@@ -159,11 +164,21 @@ def reprocessar_imagem(
     tratada = pasta / f"{tipo}.png"
 
     try:
-        imagens.reprocessar(pasta / f"{tipo}_original.png", tratada, tolerancia)
+        imagens.reprocessar(
+            pasta / f"{tipo}_original.png",
+            tratada,
+            imagens.ajustes_de_dict(edicao.model_dump()),
+        )
     except imagens.ImagemInvalida as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
-    setattr(obj, f"{tipo}_tolerancia", tolerancia)
+    setattr(obj, f"{tipo}_tolerancia", edicao.tolerancia)
+    setattr(obj, f"{tipo}_rotacao", edicao.rotacao)
+    setattr(
+        obj,
+        f"{tipo}_recorte",
+        edicao.recorte.model_dump() if edicao.recorte else None,
+    )
     setattr(obj, f"{tipo}_path", para_relativo(tratada))
     db.commit()
 

@@ -6,6 +6,7 @@ Aqui o fundo claro vira transparente, com tolerancia — papel escaneado
 quase nunca e #FFFFFF puro.
 """
 
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
@@ -20,6 +21,24 @@ TOLERANCIA_MAXIMA = 120  # acima disso comeca a comer o traco da assinatura
 
 class ImagemInvalida(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class Ajustes:
+    """O que o usuario escolheu na tela, aplicado sempre sobre o original.
+
+    O recorte vem em fracao (0..1) do lado da imagem, nao em pixels: assim a
+    caixa desenhada sobre um preview de 300px continua valendo para o arquivo
+    guardado, que pode ter 1600px. Pixels obrigariam a tela a conhecer o
+    tamanho real — e a errar sempre que ele mudasse.
+    """
+
+    remover_fundo: bool = True
+    tolerancia: int = TOLERANCIA_PADRAO
+    # graus no sentido horario; o usuario pensa "girar para a direita"
+    rotacao: float = 0.0
+    # (x, y, largura, altura) em fracao; None = imagem inteira
+    recorte: tuple[float, float, float, float] | None = None
 
 
 def _abrir(conteudo: bytes) -> Image.Image:
@@ -53,45 +72,118 @@ def salvar_original(conteudo: bytes, destino: Path) -> None:
     img.save(destino, format="PNG", optimize=True)
 
 
-def remover_fundo(
-    conteudo: bytes, destino: Path, tolerancia: int = TOLERANCIA_PADRAO
-) -> None:
-    """Deixa transparente todo pixel proximo do branco e corta as bordas vazias.
+def ajustes_de_dict(dados: dict) -> Ajustes:
+    """Monta os Ajustes a partir do dicionario que vem da API ou do banco.
+
+    Os dois lados falam o mesmo formato — `{x, y, largura, altura}` para o
+    recorte —, entao a traducao mora aqui e nao em cada rota.
+    """
+    recorte = dados.get("recorte")
+    return Ajustes(
+        remover_fundo=dados.get("remover_fundo", True),
+        tolerancia=dados.get("tolerancia", TOLERANCIA_PADRAO),
+        rotacao=dados.get("rotacao", 0),
+        recorte=(
+            (recorte["x"], recorte["y"], recorte["largura"], recorte["altura"])
+            if recorte
+            else None
+        ),
+    )
+
+
+def _recortar(img: Image.Image, caixa: tuple[float, float, float, float]) -> Image.Image:
+    x, y, largura, altura = caixa
+    esquerda = int(x * img.width)
+    topo = int(y * img.height)
+    direita = int((x + largura) * img.width)
+    base = int((y + altura) * img.height)
+
+    # a caixa vem da tela; um arraste torto nao pode gerar recorte vazio
+    esquerda, topo = max(0, esquerda), max(0, topo)
+    direita = min(img.width, max(direita, esquerda + 1))
+    base = min(img.height, max(base, topo + 1))
+    return img.crop((esquerda, topo, direita, base))
+
+
+def _girar(img: Image.Image, graus: float) -> Image.Image:
+    """Gira no sentido horario, expandindo a tela para nao cortar os cantos.
+
+    O Pillow gira no anti-horario, dai o sinal invertido. `expand` evita o
+    caso classico de girar 90 graus e perder metade da assinatura; o vazio
+    que sobra nos cantos ja nasce transparente.
+    """
+    if not graus % 360:
+        return img
+    return img.rotate(
+        -graus,
+        resample=Image.Resampling.BICUBIC,
+        expand=True,
+        fillcolor=(0, 0, 0, 0),
+    )
+
+
+def _remover_fundo(img: Image.Image, tolerancia: int) -> Image.Image:
+    """Deixa transparente todo pixel proximo do branco.
 
     tolerancia: 0 remove so o branco puro; valores maiores pegam o cinza do
     papel escaneado. 40 e um meio-termo que funciona bem na pratica.
     """
-    img = _redimensionar(_abrir(conteudo).convert("RGBA"))
     limite = 255 - tolerancia
-
-    pixels = img.getdata()
     novos = [
         (r, g, b, 0) if (r >= limite and g >= limite and b >= limite) else (r, g, b, a)
-        for r, g, b, a in pixels
+        for r, g, b, a in img.getdata()
     ]
     img.putdata(novos)
+    return img
 
-    # corta o excesso de area transparente: sem isso a assinatura fica
-    # minuscula no meio de uma folha vazia ao ser posicionada no PDF
+
+def _aparar(img: Image.Image) -> Image.Image:
+    """Corta o excesso transparente das bordas.
+
+    Sem isso a assinatura fica minuscula no meio de uma folha vazia ao ser
+    posicionada no PDF — a altura configurada valeria para o papel, nao para
+    o traco.
+    """
     caixa = img.getbbox()
-    if caixa:
-        img = img.crop(caixa)
+    return img.crop(caixa) if caixa else img
+
+
+def processar(conteudo: bytes, destino: Path, ajustes: Ajustes) -> None:
+    """Aplica recorte, rotacao e remocao de fundo, nesta ordem.
+
+    A ordem importa: recortar antes de girar deixa a caixa desenhada na tela
+    corresponder ao que o usuario viu, e remover o fundo depois de girar
+    apaga tambem o branco que a interpolacao da rotacao criou nas bordas.
+    """
+    img = _redimensionar(_abrir(conteudo).convert("RGBA"))
+
+    if ajustes.recorte:
+        img = _recortar(img, ajustes.recorte)
+    img = _girar(img, ajustes.rotacao)
+    if ajustes.remover_fundo:
+        img = _aparar(_remover_fundo(img, ajustes.tolerancia))
 
     img.save(destino, format="PNG", optimize=True)
 
 
-def reprocessar(original: Path, destino: Path, tolerancia: int) -> None:
-    """Refaz a remocao de fundo a partir do original, com outra tolerancia.
+def remover_fundo(
+    conteudo: bytes, destino: Path, tolerancia: int = TOLERANCIA_PADRAO
+) -> None:
+    processar(conteudo, destino, Ajustes(tolerancia=tolerancia))
+
+
+def reprocessar(original: Path, destino: Path, ajustes: Ajustes) -> None:
+    """Reaplica os ajustes a partir do original.
 
     E por isso que o original e guardado: cada ajuste parte sempre da imagem
     intacta. Reprocessar em cima da tratada acumularia perda a cada passada —
-    o que ja foi apagado nao volta.
+    o que ja foi apagado nao volta, e girar duas vezes borraria o traco.
     """
     if not original.exists():
         raise ImagemInvalida(
             "Imagem original nao encontrada. Envie o arquivo novamente."
         )
-    remover_fundo(original.read_bytes(), destino, tolerancia)
+    processar(original.read_bytes(), destino, ajustes)
 
 
 def dimensoes(caminho: Path) -> tuple[int, int]:

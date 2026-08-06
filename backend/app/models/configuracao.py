@@ -64,6 +64,8 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     # colorido intencional seria comido pela remocao
     logo_remover_fundo: Mapped[bool] = mapped_column(Boolean, default=False)
     logo_tolerancia: Mapped[int] = mapped_column(default=40)
+    logo_rotacao: Mapped[int] = mapped_column(default=0)
+    logo_recorte: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     # ---- Rodape ----
     # mesma ideia do cabecalho: quais dados do escritorio aparecem.
@@ -96,6 +98,12 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     # a imagem a partir do original sem novo upload.
     rubrica_tolerancia: Mapped[int] = mapped_column(default=40)
     assinatura_tolerancia: Mapped[int] = mapped_column(default=40)
+    # graus no sentido horario e caixa de recorte em fracao do lado
+    # ({x, y, largura, altura}); NULL = imagem inteira
+    rubrica_rotacao: Mapped[int] = mapped_column(default=0)
+    assinatura_rotacao: Mapped[int] = mapped_column(default=0)
+    rubrica_recorte: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    assinatura_recorte: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     # ---- Posicionamento da assinatura ----
     # "fixa": posicao padrao no rodape da ultima pagina.

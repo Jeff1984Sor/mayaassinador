@@ -43,6 +43,33 @@ class Tipografia(BaseModel):
         return v.upper()
 
 
+class Recorte(BaseModel):
+    """Caixa de recorte em fracao do lado da imagem, nao em pixels.
+
+    Assim a caixa desenhada sobre o preview vale para o arquivo guardado,
+    independente do tamanho real dele.
+    """
+
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    largura: float = Field(gt=0, le=1)
+    altura: float = Field(gt=0, le=1)
+
+
+class EdicaoImagem(BaseModel):
+    """Corpo do endpoint de reprocessar: o estado completo do editor.
+
+    Vai inteiro a cada ajuste, e nao em campos avulsos, porque o resultado
+    sempre nasce do original — nao existe "aplicar so a rotacao" sobre a
+    imagem ja tratada.
+    """
+
+    remover_fundo: bool = True
+    tolerancia: int = Field(default=40, ge=0, le=120)
+    rotacao: int = Field(default=0, ge=-180, le=180)
+    recorte: Recorte | None = None
+
+
 class CabecalhoCampos(BaseModel):
     """Quais dados do escritorio aparecem no cabecalho (checkboxes da tela)."""
 
@@ -79,6 +106,8 @@ class ConfiguracaoUpdate(BaseModel):
     logo_altura: int = Field(default=34, ge=10, le=120)
     logo_remover_fundo: bool = False
     logo_tolerancia: int = Field(default=40, ge=0, le=120)
+    logo_rotacao: int = Field(default=0, ge=-180, le=180)
+    logo_recorte: Recorte | None = None
 
     rodape_campos: RodapeCampos = RodapeCampos()
     rodape_texto: str | None = Field(default=None, max_length=2000)
@@ -98,6 +127,10 @@ class ConfiguracaoUpdate(BaseModel):
     # regrava a imagem; aqui ela viaja so para o formulario nao perder o valor
     rubrica_tolerancia: int = Field(default=40, ge=0, le=120)
     assinatura_tolerancia: int = Field(default=40, ge=0, le=120)
+    rubrica_rotacao: int = Field(default=0, ge=-180, le=180)
+    assinatura_rotacao: int = Field(default=0, ge=-180, le=180)
+    rubrica_recorte: Recorte | None = None
+    assinatura_recorte: Recorte | None = None
 
     # ---- Posicao da assinatura ----
     assinatura_modo: Literal["fixa", "ancora"] = "fixa"
@@ -127,6 +160,8 @@ class ConfiguracaoOut(BaseModel):
     logo_altura: int
     logo_remover_fundo: bool
     logo_tolerancia: int
+    logo_rotacao: int
+    logo_recorte: Recorte | None
 
     rodape_campos: RodapeCampos
     rodape_texto: str | None
@@ -141,6 +176,10 @@ class ConfiguracaoOut(BaseModel):
     assinatura_altura: int
     rubrica_tolerancia: int
     assinatura_tolerancia: int
+    rubrica_rotacao: int
+    assinatura_rotacao: int
+    rubrica_recorte: Recorte | None
+    assinatura_recorte: Recorte | None
     assinatura_modo: Literal["fixa", "ancora"]
     assinatura_ancora: str | None
     assinatura_relativa: Literal["acima", "abaixo"]

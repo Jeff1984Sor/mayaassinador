@@ -50,6 +50,25 @@ export type Escritorio = {
   logo_original_url: string | null;
 };
 
+/** Caixa de recorte em fracao (0..1) do lado da imagem, nunca em pixels:
+ *  assim a caixa desenhada sobre o preview vale para o arquivo guardado. */
+export type Recorte = {
+  x: number;
+  y: number;
+  largura: number;
+  altura: number;
+};
+
+/** Estado completo do editor. Viaja inteiro a cada ajuste porque o
+ *  resultado sempre nasce do original — nao existe aplicar so a rotacao. */
+export type EdicaoImagem = {
+  remover_fundo: boolean;
+  tolerancia: number;
+  /** graus no sentido horario */
+  rotacao: number;
+  recorte: Recorte | null;
+};
+
 export type Configuracao = {
   id: number;
   cabecalho_campos: CabecalhoCampos;
@@ -59,6 +78,8 @@ export type Configuracao = {
   logo_altura: number;
   logo_remover_fundo: boolean;
   logo_tolerancia: number;
+  logo_rotacao: number;
+  logo_recorte: Recorte | null;
   rodape_campos: CabecalhoCampos;
   rodape_texto: string | null;
   rodape_tipografia: Tipografia;
@@ -72,6 +93,10 @@ export type Configuracao = {
   /** forca da remocao de fundo: 0 tira so o branco puro */
   rubrica_tolerancia: number;
   assinatura_tolerancia: number;
+  rubrica_rotacao: number;
+  assinatura_rotacao: number;
+  rubrica_recorte: Recorte | null;
+  assinatura_recorte: Recorte | null;
   assinatura_modo: "fixa" | "ancora";
   assinatura_ancora: string | null;
   assinatura_relativa: "acima" | "abaixo";

@@ -2,13 +2,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 
 from app.api.deps import DbSession, TenantAtual, UsuarioAtual
 from app.core.storage import dir_config, para_relativo, remover
 from app.models import ConfiguracaoTenant, Escritorio
-from app.schemas.configuracao import UploadOut
+from app.schemas.configuracao import EdicaoImagem, UploadOut
 from app.schemas.escritorio import EscritorioOut, EscritorioUpdate
 from app.services import imagens
 
@@ -92,6 +92,10 @@ async def enviar_logo(
 
     obj = _buscar(db, tenant.id)
     obj.logo_path = para_relativo(destino)
+    if config:
+        # recorte e rotacao eram coordenadas do logo anterior
+        config.logo_rotacao = 0
+        config.logo_recorte = None
     db.commit()
 
     largura, altura = imagens.dimensoes(destino)
@@ -106,13 +110,9 @@ async def enviar_logo(
 
 @router.post("/logo/reprocessar", response_model=UploadOut)
 def reprocessar_logo(
-    tenant: TenantAtual,
-    db: DbSession,
-    _: UsuarioAtual,
-    remover_fundo: Annotated[bool, Query()],
-    tolerancia: Annotated[int, Query(ge=0, le=imagens.TOLERANCIA_MAXIMA)],
+    edicao: EdicaoImagem, tenant: TenantAtual, db: DbSession, _: UsuarioAtual
 ) -> UploadOut:
-    """Liga/desliga o tratamento do logo, sempre a partir do original."""
+    """Reaplica recorte, rotacao e tratamento do logo, a partir do original."""
     obj = _buscar(db, tenant.id)
     if not obj.logo_path:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nenhum logo enviado")
@@ -122,21 +122,20 @@ def reprocessar_logo(
     destino = pasta / "logo.png"
 
     try:
-        if remover_fundo:
-            imagens.reprocessar(original, destino, tolerancia)
-        elif original.exists():
-            imagens.salvar_original(original.read_bytes(), destino)
-        else:
-            raise imagens.ImagemInvalida(
-                "Logo original nao encontrado. Envie o arquivo novamente."
-            )
+        imagens.reprocessar(
+            original, destino, imagens.ajustes_de_dict(edicao.model_dump())
+        )
     except imagens.ImagemInvalida as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
     config = _configuracao(db, tenant.id)
     if config:
-        config.logo_remover_fundo = remover_fundo
-        config.logo_tolerancia = tolerancia
+        config.logo_remover_fundo = edicao.remover_fundo
+        config.logo_tolerancia = edicao.tolerancia
+        config.logo_rotacao = edicao.rotacao
+        config.logo_recorte = (
+            edicao.recorte.model_dump() if edicao.recorte else None
+        )
     obj.logo_path = para_relativo(destino)
     db.commit()
 
