@@ -35,6 +35,35 @@ cliente: filtre por `mayaassinador-` inteiro antes de reiniciar qualquer
 coisa. Para achar o processo do nosso frontend entre as varias aplicacoes
 Next do servidor: `pgrep -af "next start -p 3030"`.
 
+## Deploy completo (use este)
+
+Roteiro unico, seguro de rodar mesmo quando so um lado mudou. As secoes
+separadas abaixo ficam como referencia, mas escolher a dedo qual servico
+reiniciar ja custou caro duas vezes: a tela quebrou por falta do restart do
+frontend, e a API recusou um valor novo por falta do restart dela.
+
+```bash
+cd ~/mayaassinador && git pull
+
+cd backend
+.venv/bin/pip install -r requirements.txt   # inofensivo se nada mudou
+.venv/bin/alembic upgrade head              # inofensivo se nao ha migration
+.venv/bin/pytest -q
+
+cd ../frontend
+npm install
+npm run build                               # ANTES do restart, sempre
+
+sudo systemctl restart mayaassinador-api mayaassinador-worker mayaassinador-frontend
+
+# fumaca: API viva e frontend servindo o build atual
+curl -s http://127.0.0.1:8030/api/health; echo
+C=$(curl -s http://127.0.0.1:3030/escritorio/login | grep -o '/_next/static/css/[^"]*' | head -1)
+curl -s -o /dev/null -w "css: %{http_code}\n" "http://127.0.0.1:3030$C"
+```
+
+O `css: 200` e a parte que importa — ver a armadilha no fim deste arquivo.
+
 ## Deploy do backend
 
 ```bash
