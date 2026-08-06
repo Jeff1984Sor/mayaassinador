@@ -13,7 +13,7 @@ import {
   Marcador,
   Tamanho,
 } from "@/components/config/campos";
-import { PreviewA4 } from "@/components/config/preview-a4";
+import { LIMITES, PreviewA4 } from "@/components/config/preview-a4";
 import { UploadImagem } from "@/components/config/upload-imagem";
 import { api, mensagemErro } from "@/lib/api";
 import type {
@@ -569,9 +569,7 @@ export default function ConfiguracoesPage() {
                   descricao="Altura no cabecalho. A largura acompanha, mantendo a proporcao da imagem."
                   valor={cfg.logo_altura}
                   onChange={(v) => setConfig("logo_altura", v)}
-                  min={10}
-                  max={120}
-                  padrao={34}
+                  {...LIMITES.logo_altura}
                 />
               )}
 
@@ -698,9 +696,7 @@ export default function ConfiguracoesPage() {
                 descricao="Altura do carimbo no canto inferior direito das paginas."
                 valor={cfg.rubrica_altura}
                 onChange={(v) => setConfig("rubrica_altura", v)}
-                min={10}
-                max={80}
-                padrao={26}
+                {...LIMITES.rubrica_altura}
               />
 
               <Marcador
@@ -737,9 +733,7 @@ export default function ConfiguracoesPage() {
                 descricao="Altura da assinatura na pagina do fecho."
                 valor={cfg.assinatura_altura}
                 onChange={(v) => setConfig("assinatura_altura", v)}
-                min={20}
-                max={200}
-                padrao={84}
+                {...LIMITES.assinatura_altura}
               />
 
               <p className="rounded-lg bg-teal/10 px-3 py-2 text-xs text-teal">
@@ -1027,6 +1021,9 @@ export default function ConfiguracoesPage() {
                 assinaturaSrc={urlArquivo(cfg.assinatura_url)}
                 pagina={paginaPreview}
                 escala={0.58}
+                // arrastar a alca do carimbo edita a mesma altura dos
+                // sliders da aba — os dois mexem no mesmo campo
+                onAltura={(campo, valor) => setConfig(campo, valor)}
               />
             </div>
 

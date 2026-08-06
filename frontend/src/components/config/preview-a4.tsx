@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 import {
   ALINHA_CSS,
   PILHA_FONTE,
@@ -14,6 +16,140 @@ import {
 const LARGURA_PT = 595;
 const ALTURA_PT = 842;
 const MARGEM_PT = 56; // ~2cm
+
+/** Teto de largura dos carimbos, como fracao da altura escolhida.
+ *  Espelha RAZAO_LARGURA_MAX em pdf_carimbo.py — manter as duas em sincronia,
+ *  senao o preview volta a mentir sobre o tamanho do carimbo. */
+const RAZAO_LARGURA_MAX = 3.45;
+
+/** Dimensoes do carimbo a partir da altura configurada.
+ *  `objectFit: contain` faz o papel do escalonamento proporcional do Pillow:
+ *  a imagem cresce ate a altura pedida e recua se estourar a largura. */
+function carimbo(altura: number, teto: number | null): React.CSSProperties {
+  return {
+    height: altura,
+    maxWidth: teto ? altura * teto : undefined,
+    objectFit: "contain",
+  };
+}
+
+/** Faixa e padrao de cada carimbo, em pt.
+ *
+ * Fonte unica para a alca de arraste e para os sliders da aba — e a mesma
+ * faixa validada nos Fields do backend (schemas/configuracao.py). */
+export const LIMITES = {
+  logo_altura: { min: 10, max: 120, padrao: 34 },
+  rubrica_altura: { min: 10, max: 80, padrao: 26 },
+  assinatura_altura: { min: 20, max: 200, padrao: 84 },
+} as const;
+
+export type CampoAltura = keyof typeof LIMITES;
+
+/** Quem tem teto de largura e quem nao tem.
+ *
+ * O logo entra no .docx por `add_picture(height=...)`, que so fixa a altura e
+ * deixa a largura acompanhar a proporcao — nao existe teto la, e inventar um
+ * aqui encolheria no preview um logo largo que sairia inteiro no PDF. Rubrica
+ * e assinatura passam pelo pdf_carimbo, que tem o teto. */
+const TETO_LARGURA: Record<CampoAltura, number | null> = {
+  logo_altura: null,
+  rubrica_altura: RAZAO_LARGURA_MAX,
+  assinatura_altura: RAZAO_LARGURA_MAX,
+};
+
+/** Imagem com alca de canto para redimensionar arrastando, como no Paint.
+ *
+ * A pagina inteira e desenhada em pt e escalada por CSS (`transform:
+ * scale`), entao o arraste chega em pixels de tela: dividir pela escala e o
+ * que faz 10px de mouse virarem os 10pt certos no PDF. Sem isso o carimbo
+ * cresceria mais rapido ou mais devagar que a mao.
+ */
+function Redimensionavel({
+  src,
+  campo,
+  altura,
+  escala,
+  onAltura,
+  opacidade = 1,
+}: {
+  src: string;
+  campo: CampoAltura;
+  altura: number;
+  escala: number;
+  /** ausente = preview so de leitura, sem alca */
+  onAltura?: (campo: CampoAltura, valor: number) => void;
+  opacidade?: number;
+}) {
+  const inicio = useRef<{ x: number; y: number; altura: number } | null>(null);
+  const { min, max } = LIMITES[campo];
+
+  function aoMover(e: React.PointerEvent) {
+    if (!inicio.current || !onAltura) return;
+    const dy = (e.clientY - inicio.current.y) / escala;
+    const dx = (e.clientX - inicio.current.x) / escala;
+    // media entre os dois eixos: arrastar na diagonal do canto cresce junto,
+    // que e o gesto que a pessoa espera do canto de uma imagem
+    const delta = (dy + dx / (TETO_LARGURA[campo] ?? RAZAO_LARGURA_MAX)) / 2;
+    const nova = Math.round(inicio.current.altura + delta);
+    onAltura(campo, Math.min(max, Math.max(min, nova)));
+  }
+
+  return (
+    <span style={{ position: "relative", display: "inline-block", lineHeight: 0 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        draggable={false}
+        style={{ ...carimbo(altura, TETO_LARGURA[campo]), opacity: opacidade }}
+      />
+
+      {onAltura && (
+        <span
+          role="slider"
+          aria-label="Redimensionar"
+          aria-valuenow={altura}
+          aria-valuemin={min}
+          aria-valuemax={max}
+          tabIndex={0}
+          onPointerDown={(e) => {
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            inicio.current = { x: e.clientX, y: e.clientY, altura };
+          }}
+          onPointerMove={aoMover}
+          onPointerUp={() => {
+            inicio.current = null;
+          }}
+          // teclado: a alca precisa funcionar sem mouse
+          onKeyDown={(e) => {
+            const passo = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
+            if (!passo) return;
+            e.preventDefault();
+            onAltura(campo, Math.min(max, Math.max(min, altura + passo)));
+          }}
+          title={`${altura}pt — arraste para redimensionar`}
+          // a alca vive dentro da pagina, que esta escalada por CSS: dividir
+          // pela escala mantem o alvo do mesmo tamanho na tela em qualquer
+          // zoom. Sem isso ela encolhe junto com a pagina e fica impossivel
+          // de pegar.
+          style={{
+            position: "absolute",
+            right: -5 / escala,
+            bottom: -5 / escala,
+            width: 9 / escala,
+            height: 9 / escala,
+            background: "#fff",
+            borderStyle: "solid",
+            borderWidth: 1.5 / escala,
+            borderColor: "#7C8FFF",
+            cursor: "nwse-resize",
+            touchAction: "none",
+          }}
+        />
+      )}
+    </span>
+  );
+}
 
 const LOREM_JURIDICO = [
   "EXCELENTISSIMO SENHOR DOUTOR JUIZ DE DIREITO DA VARA CIVEL DA COMARCA DE SAO PAULO",
@@ -78,11 +214,15 @@ function Cabecalho({
   escritorio,
   logoSrc,
   numeracao,
+  escala,
+  onAltura,
 }: {
   config: Configuracao;
   escritorio?: Escritorio;
   logoSrc: string | null;
   numeracao?: React.ReactNode;
+  escala: number;
+  onAltura?: (campo: CampoAltura, valor: number) => void;
 }) {
   const linhas = linhasEscritorio(escritorio, config.cabecalho_campos);
   const t = config.cabecalho_tipografia;
@@ -110,13 +250,15 @@ function Cabecalho({
   );
 
   // eslint-disable-next-line @next/next/no-img-element
+  // a altura vem da configuracao, igual ao `add_picture` do docx_timbre;
+  // a largura acompanha, mantendo a proporcao da imagem
   const logo = temLogo ? (
-    <img
+    <Redimensionavel
       src={logoSrc!}
-      alt=""
-      // a altura vem da configuracao, igual ao `add_picture` do docx_timbre;
-      // a largura fica livre para a imagem manter a propria proporcao
-      style={{ height: config.logo_altura, maxWidth: "100%", objectFit: "contain" }}
+      campo="logo_altura"
+      altura={config.logo_altura}
+      escala={escala}
+      onAltura={onAltura}
     />
   ) : null;
 
@@ -261,6 +403,7 @@ export function PreviewA4({
   assinaturaSrc,
   pagina,
   escala = 0.62,
+  onAltura,
 }: {
   config: Configuracao;
   escritorio?: Escritorio;
@@ -270,8 +413,46 @@ export function PreviewA4({
   /** "primeira" mostra o miolo; "ultima" mostra assinatura, rubrica e QR */
   pagina: "primeira" | "ultima";
   escala?: number;
+  /** ausente = preview so de leitura, sem as alcas de redimensionar */
+  onAltura?: (campo: CampoAltura, valor: number) => void;
 }) {
   const ehUltima = pagina === "ultima";
+  const ancorada = config.assinatura_modo === "ancora";
+
+  // O carimbo real alinha a imagem pelo INICIO da linha do nome (`ancora.x`
+  // em pdf_carimbo), nao pelo centro dela. Aqui o bloco do nome tem 240pt
+  // centrados, entao encostamos a assinatura na borda esquerda desse bloco.
+  const assinatura = assinaturaSrc ? (
+    <div
+      style={{
+        width: 240,
+        margin: "0 auto",
+        textAlign: ancorada ? "left" : "center",
+      }}
+    >
+      <Redimensionavel
+        src={assinaturaSrc}
+        campo="assinatura_altura"
+        altura={config.assinatura_altura}
+        escala={escala}
+        onAltura={onAltura}
+      />
+    </div>
+  ) : (
+    <div
+      style={{
+        height: config.assinatura_altura,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "9pt",
+        color: "#b6bac7",
+        fontStyle: "italic",
+      }}
+    >
+      assinatura nao cadastrada
+    </div>
+  );
 
   return (
     <div
@@ -286,6 +467,8 @@ export function PreviewA4({
           config={config}
           escritorio={escritorio}
           logoSrc={logoSrc}
+          escala={escala}
+          onAltura={onAltura}
           numeracao={
             config.rodape_numeracao && config.numeracao_local === "cabecalho" ? (
               <div
@@ -327,28 +510,8 @@ export function PreviewA4({
 
           {ehUltima && (
             <div style={{ marginTop: 24, textAlign: "center" }}>
-              {assinaturaSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={assinaturaSrc}
-                  alt=""
-                  style={{ maxHeight: 64, maxWidth: 220, objectFit: "contain" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    height: 64,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "9pt",
-                    color: "#b6bac7",
-                    fontStyle: "italic",
-                  }}
-                >
-                  assinatura nao cadastrada
-                </div>
-              )}
+              {/* modo "ancora" com "acima": a assinatura vem antes do nome */}
+              {ancorada && config.assinatura_relativa === "acima" && assinatura}
               <div
                 style={{
                   borderTop: "1pt solid #333",
@@ -372,25 +535,38 @@ export function PreviewA4({
                   </div>
                 )}
               </div>
+              {ancorada && config.assinatura_relativa === "abaixo" && assinatura}
+            </div>
+          )}
+
+          {/* modo "fixa": centralizada no pe da pagina, ignorando o nome —
+              e o fallback do backend quando a ancora nao e encontrada */}
+          {ehUltima && !ancorada && (
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 46,
+                textAlign: "center",
+              }}
+            >
+              {assinatura}
             </div>
           )}
 
           {/* rubrica: paginas sem assinatura, ou seja, todas menos a ultima */}
           {rubricaSrc && !ehUltima && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={rubricaSrc}
-              alt=""
-              style={{
-                position: "absolute",
-                right: 0,
-                bottom: 0,
-                maxHeight: 28,
-                maxWidth: 80,
-                objectFit: "contain",
-                opacity: 0.9,
-              }}
-            />
+            <span style={{ position: "absolute", right: 0, bottom: 0 }}>
+              <Redimensionavel
+                src={rubricaSrc}
+                campo="rubrica_altura"
+                altura={config.rubrica_altura}
+                escala={escala}
+                onAltura={onAltura}
+                opacidade={0.9}
+              />
+            </span>
           )}
 
           {/* QR de verificacao: so na ultima pagina, e so se ativado */}
