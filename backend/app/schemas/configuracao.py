@@ -77,6 +77,8 @@ class ConfiguracaoUpdate(BaseModel):
     cabecalho_tipografia: Tipografia
     logo_posicao: PosicaoLogo = "esquerda"
     logo_altura: int = Field(default=34, ge=10, le=120)
+    logo_remover_fundo: bool = False
+    logo_tolerancia: int = Field(default=40, ge=0, le=120)
 
     rodape_campos: RodapeCampos = RodapeCampos()
     rodape_texto: str | None = Field(default=None, max_length=2000)
@@ -92,6 +94,10 @@ class ConfiguracaoUpdate(BaseModel):
     # Os tetos existem para que uma imagem enorme nao cubra o texto da peca.
     rubrica_altura: int = Field(default=26, ge=10, le=80)
     assinatura_altura: int = Field(default=84, ge=20, le=200)
+    # a tolerancia tambem chega pelo endpoint de reprocessar, que e quem
+    # regrava a imagem; aqui ela viaja so para o formulario nao perder o valor
+    rubrica_tolerancia: int = Field(default=40, ge=0, le=120)
+    assinatura_tolerancia: int = Field(default=40, ge=0, le=120)
 
     # ---- Posicao da assinatura ----
     assinatura_modo: Literal["fixa", "ancora"] = "fixa"
@@ -119,6 +125,8 @@ class ConfiguracaoOut(BaseModel):
     cabecalho_tipografia: Tipografia
     logo_posicao: PosicaoLogo
     logo_altura: int
+    logo_remover_fundo: bool
+    logo_tolerancia: int
 
     rodape_campos: RodapeCampos
     rodape_texto: str | None
@@ -131,6 +139,8 @@ class ConfiguracaoOut(BaseModel):
     qrcode_ativo: bool
     rubrica_altura: int
     assinatura_altura: int
+    rubrica_tolerancia: int
+    assinatura_tolerancia: int
     assinatura_modo: Literal["fixa", "ancora"]
     assinatura_ancora: str | None
     assinatura_relativa: Literal["acima", "abaixo"]

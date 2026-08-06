@@ -1,10 +1,12 @@
 "use client";
 
 import { Loader2, Trash2, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { api, mensagemErro } from "@/lib/api";
+
+export const TOLERANCIA_MAXIMA = 120;
 
 export function UploadImagem({
   titulo,
@@ -13,6 +15,8 @@ export function UploadImagem({
   urlOriginal,
   endpoint,
   onMudou,
+  tolerancia,
+  onTolerancia,
 }: {
   titulo: string;
   descricao: string;
@@ -21,6 +25,9 @@ export function UploadImagem({
   urlOriginal?: string | null;
   endpoint: string;
   onMudou: () => void;
+  /** presente = a imagem passa por remocao de fundo e o slider aparece */
+  tolerancia?: number;
+  onTolerancia?: (v: number) => Promise<void>;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -116,11 +123,87 @@ export function UploadImagem({
           />
         </div>
       ) : (
+
         <div className="flex h-24 items-center justify-center rounded-lg border border-dashed
                         border-dark/15 text-xs text-dark/55">
           Nenhuma imagem enviada
         </div>
       )}
+
+      {url && tolerancia !== undefined && onTolerancia && (
+        <AjusteFundo valor={tolerancia} onAplicar={onTolerancia} />
+      )}
+    </div>
+  );
+}
+
+/** Slider da forca da remocao de fundo, com aplicacao no servidor.
+ *
+ * O recorte roda no Pillow, nao no navegador: refazer o mesmo algoritmo em
+ * canvas so criaria uma segunda verdade, e o preview passaria a divergir do
+ * PDF — o mesmo erro que o `linhasEscritorio` duplicado ja custou caro.
+ * Em troca, cada passo custa uma ida ao servidor; dai o debounce.
+ */
+function AjusteFundo({
+  valor,
+  onAplicar,
+}: {
+  valor: number;
+  onAplicar: (v: number) => Promise<void>;
+}) {
+  const [local, setLocal] = useState(valor);
+  const [aplicando, setAplicando] = useState(false);
+
+  // o valor de fora manda quando a imagem e trocada ou recarregada
+  useEffect(() => setLocal(valor), [valor]);
+
+  useEffect(() => {
+    if (local === valor) return;
+    const t = setTimeout(async () => {
+      setAplicando(true);
+      try {
+        await onAplicar(local);
+      } finally {
+        setAplicando(false);
+      }
+    }, 450);
+    return () => clearTimeout(t);
+    // onAplicar muda a cada render do pai; segui-lo reiniciaria o debounce
+    // para sempre e o slider nunca aplicaria nada
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [local, valor]);
+
+  return (
+    <div className="mt-3 border-t border-dark/[.07] pt-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <label className="rotulo">Forca da remocao de fundo</label>
+        {aplicando && (
+          <span className="flex items-center gap-1 text-xs text-dark/65">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            aplicando
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          type="range"
+          className="h-1.5 flex-1 cursor-pointer accent-indigo"
+          min={0}
+          max={TOLERANCIA_MAXIMA}
+          value={local}
+          onChange={(e) => setLocal(Number(e.target.value))}
+        />
+        <span className="w-8 shrink-0 text-center text-xs tabular-nums text-dark/65">
+          {local}
+        </span>
+      </div>
+
+      <p className="mt-1 text-xs text-dark/65">
+        Menor tira so o branco puro; maior alcanca o cinza do papel escaneado.
+        Se o traco comecar a sumir, volte. Cada ajuste parte do original, entao
+        da para ir e voltar sem estragar a imagem.
+      </p>
     </div>
   );
 }

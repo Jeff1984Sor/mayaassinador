@@ -60,6 +60,10 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     logo_posicao: Mapped[str] = mapped_column(String(20), default="esquerda")
     # altura do logo em pontos; a largura acompanha, mantendo a proporcao
     logo_altura: Mapped[int] = mapped_column(default=34)
+    # o logo nao e tratado por padrao: costuma ter cores proprias, e um fundo
+    # colorido intencional seria comido pela remocao
+    logo_remover_fundo: Mapped[bool] = mapped_column(Boolean, default=False)
+    logo_tolerancia: Mapped[int] = mapped_column(default=40)
 
     # ---- Rodape ----
     # mesma ideia do cabecalho: quais dados do escritorio aparecem.
@@ -87,6 +91,11 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     # imagem, com um teto para nao atravessar a pagina — ver pdf_carimbo.
     rubrica_altura: Mapped[int] = mapped_column(default=26)
     assinatura_altura: Mapped[int] = mapped_column(default=84)
+    # forca da remocao de fundo: 0 tira so o branco puro, valores maiores
+    # alcancam o cinza do papel escaneado. Guardada para permitir reprocessar
+    # a imagem a partir do original sem novo upload.
+    rubrica_tolerancia: Mapped[int] = mapped_column(default=40)
+    assinatura_tolerancia: Mapped[int] = mapped_column(default=40)
 
     # ---- Posicionamento da assinatura ----
     # "fixa": posicao padrao no rodape da ultima pagina.

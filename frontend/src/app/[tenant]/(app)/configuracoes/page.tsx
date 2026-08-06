@@ -178,13 +178,15 @@ export default function ConfiguracoesPage() {
   const salvar = useMutation({
     mutationFn: async () => {
       if (!esc || !cfg) return;
-      const { id, logo_url, ...dadosEsc } = esc;
+      const { id, logo_url, logo_original_url, ...dadosEsc } = esc;
       await api.put(`/api/${tenant}/escritorio`, dadosEsc);
       await api.put(`/api/${tenant}/configuracoes`, {
         cabecalho_campos: cfg.cabecalho_campos,
         cabecalho_tipografia: cfg.cabecalho_tipografia,
         logo_posicao: cfg.logo_posicao,
         logo_altura: cfg.logo_altura,
+        logo_remover_fundo: cfg.logo_remover_fundo,
+        logo_tolerancia: cfg.logo_tolerancia,
         rodape_campos: cfg.rodape_campos,
         rodape_texto: cfg.rodape_texto,
         rodape_tipografia: cfg.rodape_tipografia,
@@ -195,6 +197,8 @@ export default function ConfiguracoesPage() {
         qrcode_ativo: cfg.qrcode_ativo,
         rubrica_altura: cfg.rubrica_altura,
         assinatura_altura: cfg.assinatura_altura,
+        rubrica_tolerancia: cfg.rubrica_tolerancia,
+        assinatura_tolerancia: cfg.assinatura_tolerancia,
         assinatura_modo: cfg.assinatura_modo,
         assinatura_ancora: cfg.assinatura_ancora,
         assinatura_relativa: cfg.assinatura_relativa,
@@ -249,6 +253,40 @@ export default function ConfiguracoesPage() {
     setVersao((v) => v + 1);
     qc.invalidateQueries({ queryKey: ["configuracao", tenant] });
     qc.invalidateQueries({ queryKey: ["escritorio", tenant] });
+  }
+
+  /** Refaz a remocao de fundo no servidor, sempre a partir do original.
+   *
+   * O endpoint ja grava a tolerancia; o estado local acompanha para que o
+   * slider nao volte ao valor antigo enquanto a query nao recarrega. */
+  async function ajustarFundo(
+    tipo: "rubrica" | "assinatura",
+    tolerancia: number,
+  ) {
+    try {
+      await api.post(
+        `/api/${tenant}/configuracoes/imagens/${tipo}/reprocessar`,
+        null,
+        { params: { tolerancia } },
+      );
+      setConfig(`${tipo}_tolerancia`, tolerancia);
+      recarregarImagens();
+    } catch (e) {
+      toast.error(mensagemErro(e, "Nao foi possivel ajustar a imagem"));
+    }
+  }
+
+  async function ajustarLogo(remover_fundo: boolean, tolerancia: number) {
+    try {
+      await api.post(`/api/${tenant}/escritorio/logo/reprocessar`, null, {
+        params: { remover_fundo, tolerancia },
+      });
+      setConfig("logo_remover_fundo", remover_fundo);
+      setConfig("logo_tolerancia", tolerancia);
+      recarregarImagens();
+    } catch (e) {
+      toast.error(mensagemErro(e, "Nao foi possivel ajustar o logo"));
+    }
   }
 
   if (!esc || !cfg) {
@@ -443,9 +481,28 @@ export default function ConfiguracoesPage() {
                 titulo="Logo do escritorio"
                 descricao="PNG, JPG ou WEBP ate 5MB. Aparece no cabecalho."
                 url={urlArquivo(esc.logo_url)}
+                // so faz sentido comparar antes/depois quando ha tratamento
+                urlOriginal={
+                  cfg.logo_remover_fundo
+                    ? urlArquivo(esc.logo_original_url)
+                    : null
+                }
                 endpoint={`/api/${tenant}/escritorio/logo`}
                 onMudou={recarregarImagens}
+                tolerancia={
+                  cfg.logo_remover_fundo ? cfg.logo_tolerancia : undefined
+                }
+                onTolerancia={(v) => ajustarLogo(true, v)}
               />
+
+              {esc.logo_url && (
+                <Marcador
+                  rotulo="Remover o fundo branco do logo"
+                  descricao="Desligado, o logo entra como veio. Ligue se ele foi escaneado ou tem fundo branco solido — logo com fundo colorido de proposito deve ficar desligado."
+                  marcado={cfg.logo_remover_fundo}
+                  onChange={(v) => void ajustarLogo(v, cfg.logo_tolerancia)}
+                />
+              )}
             </>
           )}
 
@@ -610,6 +667,8 @@ export default function ConfiguracoesPage() {
                 urlOriginal={urlArquivo(cfg.rubrica_original_url)}
                 endpoint={`/api/${tenant}/configuracoes/imagens/rubrica`}
                 onMudou={recarregarImagens}
+                tolerancia={cfg.rubrica_tolerancia}
+                onTolerancia={(v) => ajustarFundo("rubrica", v)}
               />
 
               <Tamanho
@@ -642,6 +701,8 @@ export default function ConfiguracoesPage() {
                 urlOriginal={urlArquivo(cfg.assinatura_original_url)}
                 endpoint={`/api/${tenant}/configuracoes/imagens/assinatura`}
                 onMudou={recarregarImagens}
+                tolerancia={cfg.assinatura_tolerancia}
+                onTolerancia={(v) => ajustarFundo("assinatura", v)}
               />
 
               <Tamanho

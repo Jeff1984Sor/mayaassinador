@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 
@@ -116,13 +116,54 @@ async def enviar_imagem(
     original = pasta / f"{tipo}_original.png"
     tratada = pasta / f"{tipo}.png"
 
+    obj = _buscar(db, tenant.id)
+    tolerancia = getattr(obj, f"{tipo}_tolerancia", imagens.TOLERANCIA_PADRAO)
+
     try:
         imagens.salvar_original(conteudo, original)
-        imagens.remover_fundo(conteudo, tratada)
+        imagens.remover_fundo(conteudo, tratada, tolerancia)
     except imagens.ImagemInvalida as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
+    setattr(obj, f"{tipo}_path", para_relativo(tratada))
+    db.commit()
+
+    largura, altura = imagens.dimensoes(tratada)
+    base = f"/api/{tenant.slug}/arquivos"
+    return UploadOut(
+        url=f"{base}/{tipo}",
+        url_original=f"{base}/{tipo}_original",
+        largura=largura,
+        altura=altura,
+    )
+
+
+@router.post("/imagens/{tipo}/reprocessar", response_model=UploadOut)
+def reprocessar_imagem(
+    tipo: TipoImagem,
+    tenant: TenantAtual,
+    db: DbSession,
+    _: UsuarioAtual,
+    tolerancia: Annotated[int, Query(ge=0, le=imagens.TOLERANCIA_MAXIMA)],
+) -> UploadOut:
+    """Refaz a remocao de fundo com outra tolerancia, sem novo upload.
+
+    E o que sustenta o slider da tela: cada ajuste parte do original guardado,
+    entao da para ir e voltar a vontade sem degradar a imagem.
+    """
     obj = _buscar(db, tenant.id)
+    if not getattr(obj, f"{tipo}_path"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Nenhuma {tipo} enviada")
+
+    pasta = dir_config(tenant.slug)
+    tratada = pasta / f"{tipo}.png"
+
+    try:
+        imagens.reprocessar(pasta / f"{tipo}_original.png", tratada, tolerancia)
+    except imagens.ImagemInvalida as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+    setattr(obj, f"{tipo}_tolerancia", tolerancia)
     setattr(obj, f"{tipo}_path", para_relativo(tratada))
     db.commit()
 

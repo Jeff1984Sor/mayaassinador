@@ -47,6 +47,7 @@ export type Escritorio = {
   email: string | null;
   site: string | null;
   logo_url: string | null;
+  logo_original_url: string | null;
 };
 
 export type Configuracao = {
@@ -56,6 +57,8 @@ export type Configuracao = {
   logo_posicao: PosicaoLogo;
   /** alturas em pontos; a largura acompanha a proporcao da imagem */
   logo_altura: number;
+  logo_remover_fundo: boolean;
+  logo_tolerancia: number;
   rodape_campos: CabecalhoCampos;
   rodape_texto: string | null;
   rodape_tipografia: Tipografia;
@@ -66,6 +69,9 @@ export type Configuracao = {
   qrcode_ativo: boolean;
   rubrica_altura: number;
   assinatura_altura: number;
+  /** forca da remocao de fundo: 0 tira so o branco puro */
+  rubrica_tolerancia: number;
+  assinatura_tolerancia: number;
   assinatura_modo: "fixa" | "ancora";
   assinatura_ancora: string | null;
   assinatura_relativa: "acima" | "abaixo";

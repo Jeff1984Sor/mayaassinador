@@ -14,6 +14,9 @@ from PIL import Image, UnidentifiedImageError
 FORMATOS_ACEITOS = {"PNG", "JPEG", "WEBP"}
 LADO_MAXIMO = 1600  # px — acima disso e desperdicio no PDF
 
+TOLERANCIA_PADRAO = 40
+TOLERANCIA_MAXIMA = 120  # acima disso comeca a comer o traco da assinatura
+
 
 class ImagemInvalida(Exception):
     pass
@@ -50,7 +53,9 @@ def salvar_original(conteudo: bytes, destino: Path) -> None:
     img.save(destino, format="PNG", optimize=True)
 
 
-def remover_fundo(conteudo: bytes, destino: Path, tolerancia: int = 40) -> None:
+def remover_fundo(
+    conteudo: bytes, destino: Path, tolerancia: int = TOLERANCIA_PADRAO
+) -> None:
     """Deixa transparente todo pixel proximo do branco e corta as bordas vazias.
 
     tolerancia: 0 remove so o branco puro; valores maiores pegam o cinza do
@@ -73,6 +78,20 @@ def remover_fundo(conteudo: bytes, destino: Path, tolerancia: int = 40) -> None:
         img = img.crop(caixa)
 
     img.save(destino, format="PNG", optimize=True)
+
+
+def reprocessar(original: Path, destino: Path, tolerancia: int) -> None:
+    """Refaz a remocao de fundo a partir do original, com outra tolerancia.
+
+    E por isso que o original e guardado: cada ajuste parte sempre da imagem
+    intacta. Reprocessar em cima da tratada acumularia perda a cada passada —
+    o que ja foi apagado nao volta.
+    """
+    if not original.exists():
+        raise ImagemInvalida(
+            "Imagem original nao encontrada. Envie o arquivo novamente."
+        )
+    remover_fundo(original.read_bytes(), destino, tolerancia)
 
 
 def dimensoes(caminho: Path) -> tuple[int, int]:

@@ -79,3 +79,5 @@ class EscritorioOut(EscritorioBase):
     logo_path: str | None = None
     # URL para o frontend exibir o logo (endpoint autenticado)
     logo_url: str | None = None
+    # 'antes' da comparacao, quando o logo passa por remocao de fundo
+    logo_original_url: str | None = None

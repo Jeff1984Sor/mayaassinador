@@ -26,6 +26,7 @@ ARQUIVOS_CONFIG = {
     "assinatura": "assinatura.png",
     "rubrica_original": "rubrica_original.png",
     "assinatura_original": "assinatura_original.png",
+    "logo_original": "logo_original.png",
 }
 
 

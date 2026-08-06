@@ -2,12 +2,12 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 
 from app.api.deps import DbSession, TenantAtual, UsuarioAtual
 from app.core.storage import dir_config, para_relativo, remover
-from app.models import Escritorio
+from app.models import ConfiguracaoTenant, Escritorio
 from app.schemas.configuracao import UploadOut
 from app.schemas.escritorio import EscritorioOut, EscritorioUpdate
 from app.services import imagens
@@ -24,9 +24,19 @@ def _buscar(db: DbSession, tenant_id: int) -> Escritorio:
     return obj
 
 
+def _configuracao(db: DbSession, tenant_id: int) -> ConfiguracaoTenant | None:
+    """A preferencia de tratar o logo mora na configuracao, junto com a
+    posicao e a altura dele — mas o arquivo pertence ao escritorio."""
+    return db.scalar(
+        select(ConfiguracaoTenant).where(ConfiguracaoTenant.tenant_id == tenant_id)
+    )
+
+
 def _saida(obj: Escritorio, slug: str) -> EscritorioOut:
     out = EscritorioOut.model_validate(obj)
-    out.logo_url = f"/api/{slug}/arquivos/logo" if obj.logo_path else None
+    if obj.logo_path:
+        out.logo_url = f"/api/{slug}/arquivos/logo"
+        out.logo_original_url = f"/api/{slug}/arquivos/logo_original"
     return out
 
 
@@ -61,10 +71,22 @@ async def enviar_logo(
             f"Imagem maior que {MAX_IMAGEM_MB}MB",
         )
 
-    destino = dir_config(tenant.slug) / "logo.png"
+    pasta = dir_config(tenant.slug)
+    original = pasta / "logo_original.png"
+    destino = pasta / "logo.png"
+
+    # o logo so e tratado quando o escritorio pede: um fundo colorido
+    # intencional seria comido pela remocao
+    config = _configuracao(db, tenant.id)
+    tratar = bool(config and config.logo_remover_fundo)
+    tolerancia = config.logo_tolerancia if config else imagens.TOLERANCIA_PADRAO
+
     try:
-        # o logo nao passa por remocao de fundo: pode ter cores proprias
-        imagens.salvar_original(conteudo, destino)
+        imagens.salvar_original(conteudo, original)
+        if tratar:
+            imagens.remover_fundo(conteudo, destino, tolerancia)
+        else:
+            imagens.salvar_original(conteudo, destino)
     except imagens.ImagemInvalida as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
@@ -73,8 +95,58 @@ async def enviar_logo(
     db.commit()
 
     largura, altura = imagens.dimensoes(destino)
+    base = f"/api/{tenant.slug}/arquivos"
     return UploadOut(
-        url=f"/api/{tenant.slug}/arquivos/logo", largura=largura, altura=altura
+        url=f"{base}/logo",
+        url_original=f"{base}/logo_original",
+        largura=largura,
+        altura=altura,
+    )
+
+
+@router.post("/logo/reprocessar", response_model=UploadOut)
+def reprocessar_logo(
+    tenant: TenantAtual,
+    db: DbSession,
+    _: UsuarioAtual,
+    remover_fundo: Annotated[bool, Query()],
+    tolerancia: Annotated[int, Query(ge=0, le=imagens.TOLERANCIA_MAXIMA)],
+) -> UploadOut:
+    """Liga/desliga o tratamento do logo, sempre a partir do original."""
+    obj = _buscar(db, tenant.id)
+    if not obj.logo_path:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nenhum logo enviado")
+
+    pasta = dir_config(tenant.slug)
+    original = pasta / "logo_original.png"
+    destino = pasta / "logo.png"
+
+    try:
+        if remover_fundo:
+            imagens.reprocessar(original, destino, tolerancia)
+        elif original.exists():
+            imagens.salvar_original(original.read_bytes(), destino)
+        else:
+            raise imagens.ImagemInvalida(
+                "Logo original nao encontrado. Envie o arquivo novamente."
+            )
+    except imagens.ImagemInvalida as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+    config = _configuracao(db, tenant.id)
+    if config:
+        config.logo_remover_fundo = remover_fundo
+        config.logo_tolerancia = tolerancia
+    obj.logo_path = para_relativo(destino)
+    db.commit()
+
+    largura, altura = imagens.dimensoes(destino)
+    base = f"/api/{tenant.slug}/arquivos"
+    return UploadOut(
+        url=f"{base}/logo",
+        url_original=f"{base}/logo_original",
+        largura=largura,
+        altura=altura,
     )
 
 
@@ -82,5 +154,6 @@ async def enviar_logo(
 def remover_logo(tenant: TenantAtual, db: DbSession, _: UsuarioAtual) -> None:
     obj = _buscar(db, tenant.id)
     remover(obj.logo_path)
+    remover(f"{tenant.slug}/config/logo_original.png")
     obj.logo_path = None
     db.commit()
