@@ -117,6 +117,22 @@ export type Configuracao = {
 
 export type Fonte = { valor: string; rotulo: string };
 
+/** Resposta da pagina publica de verificacao.
+ *
+ * Carrega so o que prova a autenticidade: nada sobre o destinatario, nada
+ * de historico de envios e nenhum link para o arquivo. */
+export type Verificacao = {
+  codigo: string;
+  autentico: boolean;
+  escritorio: string;
+  signatario: string | null;
+  signatario_oab: string | null;
+  nome_arquivo: string;
+  paginas: number | null;
+  assinado_em: string | null;
+  hash_sha256: string | null;
+};
+
 /** Fontes do servidor -> pilha equivalente no navegador.
  *
  * Carlito e Caladea sao metricamente identicas a Calibri e Cambria, que e
