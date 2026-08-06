@@ -170,22 +170,29 @@ export function EditorImagem({
               }
             >
               <option value="branco">Fundo branco (papel claro)</option>
-              <option value="auto">
-                Automatico — qualquer cor de fundo
+              <option value="auto">Automatico — fundo de cor unica</option>
+              <option value="traco">
+                So o traco — remove qualquer fundo
               </option>
             </select>
             <p className="mt-1 text-xs text-dark/65">
-              {local.modo_fundo === "auto"
-                ? "Descobre a cor do fundo pelas bordas da imagem e apaga qualquer uma — cinza, colorida ou escurecida. Use para foto de celular e scanner que puxa cinza."
-                : "Apaga so o que esta perto do branco. Se sobrar um bloco cinza na imagem, troque para Automatico."}
+              {
+                {
+                  branco:
+                    "Apaga so o que esta perto do branco. Se sobrar qualquer bloco cinza, desca na lista.",
+                  auto: "Descobre a cor do fundo pelas bordas e apaga aquela cor. Bom para foto de celular e scanner que puxa cinza, desde que o fundo seja de uma cor so.",
+                  traco:
+                    "Ignora a cor do fundo: mantem so o traco escuro e apaga todo o resto, tenha a imagem quantos fundos tiver. E a opcao para quando as outras deixam sobra.",
+                }[local.modo_fundo]
+              }
             </p>
           </div>
 
           <Deslizante
             rotulo={
-              local.modo_fundo === "auto"
-                ? "Ajuste fino da borda"
-                : "Forca da remocao de fundo"
+              local.modo_fundo === "branco"
+                ? "Forca da remocao de fundo"
+                : "Ajuste fino da borda"
             }
             valor={local.tolerancia}
             min={0}
@@ -193,9 +200,9 @@ export function EditorImagem({
             onChange={(v) => mudar({ tolerancia: v })}
           />
           <p className="text-xs text-dark/65">
-            {local.modo_fundo === "auto"
-              ? "O corte entre traco e fundo e calculado da propria imagem; aqui voce so alarga ou estreita a transicao. Se a borda ficar dura, aumente."
-              : "Menor tira so o branco puro; maior alcanca o cinza do papel escaneado. Se o traco comecar a sumir, volte."}
+            {local.modo_fundo === "branco"
+              ? "Menor tira so o branco puro; maior alcanca o cinza do papel escaneado. Se o traco comecar a sumir, volte."
+              : "O corte entre traco e fundo e calculado da propria imagem; aqui voce so alarga ou estreita a transicao. Se a borda ficar dura, aumente."}
           </p>
         </>
       )}

@@ -90,3 +90,83 @@ def test_auto_nao_pinta_os_cantos_da_rotacao(tmp_path, graus):  # noqa: ANN001
             rgba.getpixel((largura - 1, altura - 1)),
         ]
     assert all(p[3] == 0 for p in cantos), f"canto opaco apos girar {graus}"
+
+
+def com_bloco_cinza(bloco: bool = True) -> bytes:
+    """Rubrica recortada de um print: bloco cinza dentro de area branca.
+
+    O caso real que o cliente reportou — dois fundos na mesma imagem.
+    `bloco=False` da a mesma imagem sem o bloco, para comparar.
+    """
+    img = Image.new("RGB", (400, 180), (252, 252, 252))
+    desenho = ImageDraw.Draw(img)
+    if bloco:
+        desenho.rectangle([150, 30, 290, 150], fill=(200, 200, 200))
+    desenho.line(
+        [(170, 120), (200, 50), (230, 120), (260, 50), (280, 110)],
+        fill=(60, 60, 70),
+        width=5,
+    )
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def sobra_de_fundo(caminho) -> int:  # noqa: ANN001
+    """Pixels claros com QUALQUER opacidade perceptivel.
+
+    Contar so alfa>128 esconderia o defeito que o cliente enxergou: o bloco
+    cinza sobrevivia translucido, invisivel para um teste frouxo e bem
+    visivel na tela.
+    """
+    with Image.open(caminho) as img:
+        pixels = list(img.convert("RGBA").getdata())
+    return sum(1 for p in pixels if p[3] > 8 and sum(p[:3]) / 3 > 140)
+
+
+def test_auto_nao_da_conta_de_dois_fundos(tmp_path):  # noqa: ANN001
+    """Documenta o limite do modo automatico — e por que "traco" existe.
+
+    As bordas so contam sobre o fundo branco; o bloco cinza no meio nao e
+    parecido com ele e sobrevive.
+    """
+    destino = tmp_path / "saida.png"
+    processar(com_bloco_cinza(), destino, Ajustes(modo_fundo="auto"))
+    assert sobra_de_fundo(destino) > 1000
+
+
+@pytest.mark.parametrize(
+    ("fundo", "descricao"),
+    [
+        (None, "so o bloco cinza dentro do branco"),
+        ((150, 150, 150), "fundo cinza inteiro"),
+        ((205, 190, 150), "fundo amarelado"),
+    ],
+)
+def test_traco_nao_deixa_sobra(tmp_path, fundo, descricao):  # noqa: ANN001
+    """O modo agressivo tem que zerar o fundo, nao amenizar."""
+    if fundo is None:
+        dados = com_bloco_cinza()
+    else:
+        dados = imagem(fundo)
+
+    destino = tmp_path / "saida.png"
+    processar(dados, destino, Ajustes(modo_fundo="traco"))
+    assert sobra_de_fundo(destino) == 0, descricao
+
+
+def test_traco_apara_ate_o_traco(tmp_path):  # noqa: ANN001
+    """A caixa final tem que fechar no traco, nao na folha.
+
+    Se o fundo sai com alfa 1 ou 2 em vez de 0, o recorte automatico acha
+    que a folha inteira e conteudo e nao corta nada — e a assinatura sai
+    minuscula no PDF, porque a altura configurada vale para o papel.
+    """
+    limpo = tmp_path / "limpo.png"
+    sujo = tmp_path / "sujo.png"
+    # mesma imagem, mesmo traco: a unica diferenca e o bloco cinza
+    processar(com_bloco_cinza(bloco=False), limpo, Ajustes(modo_fundo="traco"))
+    processar(com_bloco_cinza(), sujo, Ajustes(modo_fundo="traco"))
+
+    with Image.open(limpo) as a, Image.open(sujo) as b:
+        assert a.size == b.size, "o bloco cinza inflou a caixa final"

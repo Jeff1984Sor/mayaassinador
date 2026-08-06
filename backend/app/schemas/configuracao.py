@@ -8,9 +8,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from app.models.configuracao import FONTES_DISPONIVEIS
 
 Alinhamento = Literal["esquerda", "centro", "direita"]
-# "branco": apaga so o que esta perto do branco. "auto": estima a cor do fundo
-# pelas bordas e apaga qualquer uma — e o modo para scan acinzentado e foto.
-ModoFundo = Literal["branco", "auto"]
+# Escada do mais conservador ao mais agressivo — ver app/services/imagens.py.
+# "branco": apaga so o perto do branco. "auto": estima a cor do fundo pelas
+# bordas. "traco": mantem so a tinta e apaga o resto, quantos fundos existam.
+ModoFundo = Literal["branco", "auto", "traco"]
 # "acima": logo centralizado, texto mantem o alinhamento da tipografia
 # "centro": logo e texto centralizados juntos (papel timbrado classico)
 PosicaoLogo = Literal["esquerda", "direita", "acima", "centro", "sem_logo"]

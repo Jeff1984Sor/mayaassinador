@@ -19,12 +19,19 @@ LADO_MAXIMO = 1600  # px — acima disso e desperdicio no PDF
 TOLERANCIA_PADRAO = 40
 TOLERANCIA_MAXIMA = 120  # acima disso comeca a comer o traco da assinatura
 
-# "branco": apaga o que esta perto do branco. Rapido e previsivel, mas so
-#   serve para papel claro — fundo cinza ou colorido sobrevive.
-# "auto": descobre a cor do fundo pelas bordas e apaga tudo que se parece com
-#   ela, seja qual for. E o modo para foto de celular, scanner que puxa
-#   cinza e assinatura sobre fundo colorido.
-ModoFundo = Literal["branco", "auto"]
+# Os tres modos formam uma escada, do mais conservador ao mais agressivo:
+#
+# "branco": apaga o que esta perto do branco. Previsivel, mas so serve para
+#   papel claro — fundo cinza ou colorido sobrevive.
+# "auto": descobre a COR do fundo pelas bordas e apaga o que se parece com
+#   ela. Resolve fundo cinza ou colorido uniforme. Falha quando a imagem tem
+#   mais de um fundo (o caso classico: rubrica recortada de um print, com um
+#   retangulo cinza no meio de uma area branca) — as bordas so contam sobre
+#   um deles, e o outro sobrevive.
+# "traco": ignora a cor do fundo. Mantem so o que e escuro o bastante para
+#   ser tinta e apaga TODO o resto, quantos fundos existam. E a opcao para
+#   quem quer o fundo removido a qualquer custo.
+ModoFundo = Literal["branco", "auto", "traco"]
 
 # largura da faixa de borda usada para estimar a cor do fundo, em fracao do
 # lado: 4% pega papel suficiente sem alcancar o traco, que fica no meio
@@ -249,21 +256,7 @@ def _remover_fundo_auto(img: Image.Image, tolerancia: int) -> Image.Image:
     distancia = ImageChops.lighter(ImageChops.lighter(r, g), b)
 
     corte = _limiar_otsu(distancia.histogram())
-
-    # a tolerancia da tela vira a largura da rampa: mais tolerancia, transicao
-    # mais larga e apagando mais perto do traco
-    margem = max(4, int(tolerancia * 0.6))
-    inicio = max(0, corte - margem)
-    fim = min(255, corte + margem)
-
-    def alfa(valor: int) -> int:
-        if valor <= inicio:
-            return 0
-        if valor >= fim:
-            return 255
-        return int(255 * (valor - inicio) / (fim - inicio))
-
-    mascara = distancia.point([alfa(v) for v in range(256)])
+    mascara = _rampa(distancia, corte, tolerancia)
 
     saida = img.convert("RGBA")
     # o que ja era transparente continua transparente: sem este `darker`, os
@@ -274,14 +267,138 @@ def _remover_fundo_auto(img: Image.Image, tolerancia: int) -> Image.Image:
     return saida
 
 
+def _limiar_otsu_tres_classes(histograma: list[int]) -> int:
+    """Corte que isola a tinta quando a imagem tem TRES niveis, nao dois.
+
+    O Otsu comum separa em dois grupos. Numa rubrica recortada de um print —
+    papel branco, retangulo cinza e traco — ele poe a divisa entre o branco e
+    "todo o resto", e o cinza fica do lado da tinta: exatamente o bloco que
+    sobrava na tela. Procurando dois cortes de uma vez, o cinza ganha a
+    propria classe e so a tinta fica acima do segundo corte.
+
+    Devolve o segundo corte. Sao ~32 mil combinacoes com somas acumuladas,
+    barato o bastante para rodar a cada ajuste do slider.
+    """
+    total = sum(histograma)
+    if not total:
+        return 128
+
+    # somas acumuladas: contagem e soma ponderada ate cada nivel
+    contagem = [0] * 257
+    ponderada = [0.0] * 257
+    for i, n in enumerate(histograma):
+        contagem[i + 1] = contagem[i] + n
+        ponderada[i + 1] = ponderada[i] + i * n
+
+    def classe(inicio: int, fim: int) -> tuple[float, float]:
+        """(peso, media) do intervalo [inicio, fim]."""
+        peso = contagem[fim + 1] - contagem[inicio]
+        if peso == 0:
+            return 0.0, 0.0
+        return peso, (ponderada[fim + 1] - ponderada[inicio]) / peso
+
+    media_geral = ponderada[256] / total
+    melhor = (-1.0, 128)
+
+    for t1 in range(0, 254):
+        peso_a, media_a = classe(0, t1)
+        if peso_a == 0:
+            continue
+        for t2 in range(t1 + 1, 255):
+            peso_b, media_b = classe(t1 + 1, t2)
+            peso_c, media_c = classe(t2 + 1, 255)
+            if peso_b == 0 or peso_c == 0:
+                continue
+            variancia = (
+                peso_a * (media_a - media_geral) ** 2
+                + peso_b * (media_b - media_geral) ** 2
+                + peso_c * (media_c - media_geral) ** 2
+            )
+            if variancia > melhor[0]:
+                melhor = (variancia, t2)
+
+    return melhor[1]
+
+
+def _rampa(
+    distancia: Image.Image,
+    corte: int,
+    tolerancia: int,
+    a_partir_do_corte: bool = False,
+) -> Image.Image:
+    """Converte 'distancia ate o fundo' em canal alfa, com transicao suave.
+
+    O corte seco deixaria o traco serrilhado; a rampa em torno dele preserva
+    a borda macia da caneta. A tolerancia da tela regula a largura dela.
+
+    `a_partir_do_corte` sobe a rampa so acima do corte, em vez de centra-la
+    nele. E o que o modo "traco" precisa: centrada, a rampa alcanca a classe
+    do meio (o retangulo cinza) e devolve um alfa parcial — o fundo fica
+    translucido em vez de sumir, que na tela parece "nao removeu tudo".
+    """
+    margem = max(4, int(tolerancia * 0.6))
+    inicio = corte if a_partir_do_corte else max(0, corte - margem)
+    fim = min(255, inicio + (2 * margem if a_partir_do_corte else margem * 2))
+    fim = max(fim, inicio + 1)
+
+    def alfa(valor: int) -> int:
+        if valor <= inicio:
+            return 0
+        if valor >= fim:
+            return 255
+        return int(255 * (valor - inicio) / (fim - inicio))
+
+    return distancia.point([alfa(v) for v in range(256)])
+
+
+def _remover_fundo_traco(img: Image.Image, tolerancia: int) -> Image.Image:
+    """Mantem so o traco. Apaga o fundo inteiro, tenha ele quantas cores tiver.
+
+    A diferenca para o modo "auto" e nao perguntar QUAL e a cor do fundo:
+    aqui vale o brilho. Assinatura e tinta escura sobre algo mais claro, e
+    tudo que nao for escuro o bastante vai embora — o papel branco, o
+    retangulo cinza do print e a sombra da foto, todos de uma vez.
+
+    O limiar sai de Otsu sobre a propria imagem, entao nao ha numero para o
+    usuario adivinhar: funciona no scan lavado e na foto escura.
+    """
+    luminancia = img.convert("L")
+
+    # Papel claro e o caso normal, mas existe o inverso (giz branco em quadro
+    # escuro, assinatura digitalizada em negativo). A borda diz qual e qual.
+    fundo_claro = sum(_cor_do_fundo(img)) / 3 >= 128
+    # a distancia precisa crescer na direcao da tinta, para a rampa funcionar
+    # igual nos dois casos
+    distancia = ImageChops.invert(luminancia) if fundo_claro else luminancia
+
+    corte = _limiar_otsu_tres_classes(distancia.histogram())
+    mascara = _rampa(distancia, corte, tolerancia, a_partir_do_corte=True)
+
+    saida = img.convert("RGBA")
+    mascara = ImageChops.darker(mascara, saida.getchannel("A"))
+    saida.putalpha(mascara)
+    return saida
+
+
+# alfa abaixo disto e invisivel na pratica; serve so para nao contar como
+# conteudo na hora de aparar
+ALFA_MINIMO = 8
+
+
 def _aparar(img: Image.Image) -> Image.Image:
     """Corta o excesso transparente das bordas.
 
     Sem isso a assinatura fica minuscula no meio de uma folha vazia ao ser
     posicionada no PDF — a altura configurada valeria para o papel, nao para
     o traco.
+
+    O `getbbox` cru nao serve: a rampa deixa o fundo com um alfa residual de
+    1 ou 2, invisivel a olho nu mas suficiente para ele considerar a folha
+    inteira como conteudo e nao cortar nada. Medimos a caixa sobre um alfa
+    limpo e recortamos a imagem original, que mantem as bordas suaves.
     """
-    caixa = img.getbbox()
+    alfa = img.getchannel("A").point(lambda a: 255 if a > ALFA_MINIMO else 0)
+    caixa = alfa.getbbox()
     return img.crop(caixa) if caixa else img
 
 
@@ -298,12 +415,11 @@ def processar(conteudo: bytes, destino: Path, ajustes: Ajustes) -> None:
         img = _recortar(img, ajustes.recorte)
     img = _girar(img, ajustes.rotacao)
     if ajustes.remover_fundo:
-        sem_fundo = (
-            _remover_fundo_auto(img, ajustes.tolerancia)
-            if ajustes.modo_fundo == "auto"
-            else _remover_fundo(img, ajustes.tolerancia)
-        )
-        img = _aparar(sem_fundo)
+        limpeza = {
+            "auto": _remover_fundo_auto,
+            "traco": _remover_fundo_traco,
+        }.get(ajustes.modo_fundo, _remover_fundo)
+        img = _aparar(limpeza(img, ajustes.tolerancia))
 
     img.save(destino, format="PNG", optimize=True)
 

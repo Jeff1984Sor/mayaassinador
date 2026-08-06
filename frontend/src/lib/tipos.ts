@@ -61,7 +61,7 @@ export type Recorte = {
 
 /** Estado completo do editor. Viaja inteiro a cada ajuste porque o
  *  resultado sempre nasce do original — nao existe aplicar so a rotacao. */
-export type ModoFundo = "branco" | "auto";
+export type ModoFundo = "branco" | "auto" | "traco";
 
 export type EdicaoImagem = {
   remover_fundo: boolean;
