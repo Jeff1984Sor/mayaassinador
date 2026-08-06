@@ -72,7 +72,10 @@ export function EditorImagem({
     mudar({ rotacao: normalizar(local.rotacao + graus) });
 
   const limpo =
-    local.rotacao === 0 && !local.recorte && local.tolerancia === 40;
+    local.rotacao === 0 &&
+    !local.recorte &&
+    local.tolerancia === 40 &&
+    local.modo_fundo === "branco";
 
   return (
     <div className="mt-3 space-y-3 border-t border-dark/[.07] pt-3">
@@ -113,7 +116,12 @@ export function EditorImagem({
             className="text-xs text-indigo hover:underline disabled:opacity-40 disabled:no-underline"
             disabled={limpo}
             onClick={() =>
-              mudar({ rotacao: 0, recorte: null, tolerancia: 40 })
+              mudar({
+                rotacao: 0,
+                recorte: null,
+                tolerancia: 40,
+                modo_fundo: "branco",
+              })
             }
           >
             Restaurar
@@ -152,16 +160,42 @@ export function EditorImagem({
 
       {local.remover_fundo && (
         <>
+          <div>
+            <label className="rotulo">Como remover o fundo</label>
+            <select
+              className="campo"
+              value={local.modo_fundo}
+              onChange={(e) =>
+                mudar({ modo_fundo: e.target.value as EdicaoImagem["modo_fundo"] })
+              }
+            >
+              <option value="branco">Fundo branco (papel claro)</option>
+              <option value="auto">
+                Automatico — qualquer cor de fundo
+              </option>
+            </select>
+            <p className="mt-1 text-xs text-dark/65">
+              {local.modo_fundo === "auto"
+                ? "Descobre a cor do fundo pelas bordas da imagem e apaga qualquer uma — cinza, colorida ou escurecida. Use para foto de celular e scanner que puxa cinza."
+                : "Apaga so o que esta perto do branco. Se sobrar um bloco cinza na imagem, troque para Automatico."}
+            </p>
+          </div>
+
           <Deslizante
-            rotulo="Forca da remocao de fundo"
+            rotulo={
+              local.modo_fundo === "auto"
+                ? "Ajuste fino da borda"
+                : "Forca da remocao de fundo"
+            }
             valor={local.tolerancia}
             min={0}
             max={TOLERANCIA_MAXIMA}
             onChange={(v) => mudar({ tolerancia: v })}
           />
           <p className="text-xs text-dark/65">
-            Menor tira so o branco puro; maior alcanca o cinza do papel
-            escaneado. Se o traco comecar a sumir, volte.
+            {local.modo_fundo === "auto"
+              ? "O corte entre traco e fundo e calculado da propria imagem; aqui voce so alarga ou estreita a transicao. Se a borda ficar dura, aumente."
+              : "Menor tira so o branco puro; maior alcanca o cinza do papel escaneado. Se o traco comecar a sumir, volte."}
           </p>
         </>
       )}
@@ -353,6 +387,7 @@ function retangulo(
 function igual(a: EdicaoImagem, b: EdicaoImagem): boolean {
   return (
     a.remover_fundo === b.remover_fundo &&
+    a.modo_fundo === b.modo_fundo &&
     a.tolerancia === b.tolerancia &&
     a.rotacao === b.rotacao &&
     JSON.stringify(a.recorte) === JSON.stringify(b.recorte)

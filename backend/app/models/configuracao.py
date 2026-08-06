@@ -65,6 +65,7 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     logo_remover_fundo: Mapped[bool] = mapped_column(Boolean, default=False)
     logo_tolerancia: Mapped[int] = mapped_column(default=40)
     logo_rotacao: Mapped[int] = mapped_column(default=0)
+    logo_modo_fundo: Mapped[str] = mapped_column(String(10), default="branco")
     logo_recorte: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     # ---- Rodape ----
@@ -102,6 +103,10 @@ class ConfiguracaoTenant(Base, TimestampMixin):
     # ({x, y, largura, altura}); NULL = imagem inteira
     rubrica_rotacao: Mapped[int] = mapped_column(default=0)
     assinatura_rotacao: Mapped[int] = mapped_column(default=0)
+    # "branco" apaga so o que esta perto do branco; "auto" descobre a cor do
+    # fundo pelas bordas e apaga qualquer uma — cinza, colorida, escaneada
+    rubrica_modo_fundo: Mapped[str] = mapped_column(String(10), default="branco")
+    assinatura_modo_fundo: Mapped[str] = mapped_column(String(10), default="branco")
     rubrica_recorte: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     assinatura_recorte: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 

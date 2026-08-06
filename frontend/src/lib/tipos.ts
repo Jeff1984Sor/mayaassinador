@@ -61,8 +61,11 @@ export type Recorte = {
 
 /** Estado completo do editor. Viaja inteiro a cada ajuste porque o
  *  resultado sempre nasce do original — nao existe aplicar so a rotacao. */
+export type ModoFundo = "branco" | "auto";
+
 export type EdicaoImagem = {
   remover_fundo: boolean;
+  modo_fundo: ModoFundo;
   tolerancia: number;
   /** graus no sentido horario */
   rotacao: number;
@@ -79,6 +82,7 @@ export type Configuracao = {
   logo_remover_fundo: boolean;
   logo_tolerancia: number;
   logo_rotacao: number;
+  logo_modo_fundo: ModoFundo;
   logo_recorte: Recorte | null;
   rodape_campos: CabecalhoCampos;
   rodape_texto: string | null;
@@ -95,6 +99,8 @@ export type Configuracao = {
   assinatura_tolerancia: number;
   rubrica_rotacao: number;
   assinatura_rotacao: number;
+  rubrica_modo_fundo: ModoFundo;
+  assinatura_modo_fundo: ModoFundo;
   rubrica_recorte: Recorte | null;
   assinatura_recorte: Recorte | null;
   assinatura_modo: "fixa" | "ancora";

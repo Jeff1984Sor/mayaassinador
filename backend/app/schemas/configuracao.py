@@ -8,6 +8,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from app.models.configuracao import FONTES_DISPONIVEIS
 
 Alinhamento = Literal["esquerda", "centro", "direita"]
+# "branco": apaga so o que esta perto do branco. "auto": estima a cor do fundo
+# pelas bordas e apaga qualquer uma — e o modo para scan acinzentado e foto.
+ModoFundo = Literal["branco", "auto"]
 # "acima": logo centralizado, texto mantem o alinhamento da tipografia
 # "centro": logo e texto centralizados juntos (papel timbrado classico)
 PosicaoLogo = Literal["esquerda", "direita", "acima", "centro", "sem_logo"]
@@ -65,6 +68,7 @@ class EdicaoImagem(BaseModel):
     """
 
     remover_fundo: bool = True
+    modo_fundo: ModoFundo = "branco"
     tolerancia: int = Field(default=40, ge=0, le=120)
     rotacao: int = Field(default=0, ge=-180, le=180)
     recorte: Recorte | None = None
@@ -107,6 +111,7 @@ class ConfiguracaoUpdate(BaseModel):
     logo_remover_fundo: bool = False
     logo_tolerancia: int = Field(default=40, ge=0, le=120)
     logo_rotacao: int = Field(default=0, ge=-180, le=180)
+    logo_modo_fundo: ModoFundo = "branco"
     logo_recorte: Recorte | None = None
 
     rodape_campos: RodapeCampos = RodapeCampos()
@@ -129,6 +134,8 @@ class ConfiguracaoUpdate(BaseModel):
     assinatura_tolerancia: int = Field(default=40, ge=0, le=120)
     rubrica_rotacao: int = Field(default=0, ge=-180, le=180)
     assinatura_rotacao: int = Field(default=0, ge=-180, le=180)
+    rubrica_modo_fundo: ModoFundo = "branco"
+    assinatura_modo_fundo: ModoFundo = "branco"
     rubrica_recorte: Recorte | None = None
     assinatura_recorte: Recorte | None = None
 
@@ -161,6 +168,7 @@ class ConfiguracaoOut(BaseModel):
     logo_remover_fundo: bool
     logo_tolerancia: int
     logo_rotacao: int
+    logo_modo_fundo: ModoFundo
     logo_recorte: Recorte | None
 
     rodape_campos: RodapeCampos
@@ -178,6 +186,8 @@ class ConfiguracaoOut(BaseModel):
     assinatura_tolerancia: int
     rubrica_rotacao: int
     assinatura_rotacao: int
+    rubrica_modo_fundo: ModoFundo
+    assinatura_modo_fundo: ModoFundo
     rubrica_recorte: Recorte | None
     assinatura_recorte: Recorte | None
     assinatura_modo: Literal["fixa", "ancora"]

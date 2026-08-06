@@ -118,13 +118,16 @@ async def enviar_imagem(
     tratada = pasta / f"{tipo}.png"
 
     obj = _buscar(db, tenant.id)
-    tolerancia = getattr(obj, f"{tipo}_tolerancia", imagens.TOLERANCIA_PADRAO)
+    ajustes = imagens.Ajustes(
+        tolerancia=getattr(obj, f"{tipo}_tolerancia", imagens.TOLERANCIA_PADRAO),
+        modo_fundo=getattr(obj, f"{tipo}_modo_fundo", "branco"),
+    )
 
     try:
         imagens.salvar_original(conteudo, original)
-        # a tolerancia escolhida antes continua valendo, mas recorte e rotacao
-        # nao: eram coordenadas da imagem antiga e nao querem dizer nada nesta
-        imagens.remover_fundo(conteudo, tratada, tolerancia)
+        # tolerancia e modo escolhidos antes continuam valendo, mas recorte e
+        # rotacao nao: eram coordenadas da imagem antiga e nao dizem nada nesta
+        imagens.processar(conteudo, tratada, ajustes)
     except imagens.ImagemInvalida as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
@@ -173,6 +176,7 @@ def reprocessar_imagem(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
     setattr(obj, f"{tipo}_tolerancia", edicao.tolerancia)
+    setattr(obj, f"{tipo}_modo_fundo", edicao.modo_fundo)
     setattr(obj, f"{tipo}_rotacao", edicao.rotacao)
     setattr(
         obj,

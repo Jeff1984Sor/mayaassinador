@@ -84,7 +84,14 @@ async def enviar_logo(
     try:
         imagens.salvar_original(conteudo, original)
         if tratar:
-            imagens.remover_fundo(conteudo, destino, tolerancia)
+            imagens.processar(
+                conteudo,
+                destino,
+                imagens.Ajustes(
+                    tolerancia=tolerancia,
+                    modo_fundo=getattr(config, "logo_modo_fundo", "branco"),
+                ),
+            )
         else:
             imagens.salvar_original(conteudo, destino)
     except imagens.ImagemInvalida as exc:
@@ -132,6 +139,7 @@ def reprocessar_logo(
     if config:
         config.logo_remover_fundo = edicao.remover_fundo
         config.logo_tolerancia = edicao.tolerancia
+        config.logo_modo_fundo = edicao.modo_fundo
         config.logo_rotacao = edicao.rotacao
         config.logo_recorte = (
             edicao.recorte.model_dump() if edicao.recorte else None

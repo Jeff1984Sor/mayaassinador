@@ -192,6 +192,7 @@ export default function ConfiguracoesPage() {
         logo_altura: cfg.logo_altura,
         logo_remover_fundo: cfg.logo_remover_fundo,
         logo_tolerancia: cfg.logo_tolerancia,
+        logo_modo_fundo: cfg.logo_modo_fundo,
         logo_rotacao: cfg.logo_rotacao,
         logo_recorte: cfg.logo_recorte,
         rodape_campos: cfg.rodape_campos,
@@ -206,6 +207,8 @@ export default function ConfiguracoesPage() {
         assinatura_altura: cfg.assinatura_altura,
         rubrica_tolerancia: cfg.rubrica_tolerancia,
         assinatura_tolerancia: cfg.assinatura_tolerancia,
+        rubrica_modo_fundo: cfg.rubrica_modo_fundo,
+        assinatura_modo_fundo: cfg.assinatura_modo_fundo,
         rubrica_rotacao: cfg.rubrica_rotacao,
         assinatura_rotacao: cfg.assinatura_rotacao,
         rubrica_recorte: cfg.rubrica_recorte,
@@ -284,6 +287,7 @@ export default function ConfiguracoesPage() {
           ? {
               ...c,
               [`${tipo}_tolerancia`]: edicao.tolerancia,
+              [`${tipo}_modo_fundo`]: edicao.modo_fundo,
               [`${tipo}_rotacao`]: edicao.rotacao,
               [`${tipo}_recorte`]: edicao.recorte,
             }
@@ -304,6 +308,7 @@ export default function ConfiguracoesPage() {
               ...c,
               logo_remover_fundo: edicao.remover_fundo,
               logo_tolerancia: edicao.tolerancia,
+              logo_modo_fundo: edicao.modo_fundo,
               logo_rotacao: edicao.rotacao,
               logo_recorte: edicao.recorte,
             }
@@ -512,6 +517,7 @@ export default function ConfiguracoesPage() {
                 onMudou={recarregarImagens}
                 edicao={{
                   remover_fundo: cfg.logo_remover_fundo,
+                  modo_fundo: cfg.logo_modo_fundo,
                   tolerancia: cfg.logo_tolerancia,
                   rotacao: cfg.logo_rotacao,
                   recorte: cfg.logo_recorte,
@@ -684,6 +690,7 @@ export default function ConfiguracoesPage() {
                 onMudou={recarregarImagens}
                 edicao={{
                   remover_fundo: true,
+                  modo_fundo: cfg.rubrica_modo_fundo,
                   tolerancia: cfg.rubrica_tolerancia,
                   rotacao: cfg.rubrica_rotacao,
                   recorte: cfg.rubrica_recorte,
@@ -721,6 +728,7 @@ export default function ConfiguracoesPage() {
                 onMudou={recarregarImagens}
                 edicao={{
                   remover_fundo: true,
+                  modo_fundo: cfg.assinatura_modo_fundo,
                   tolerancia: cfg.assinatura_tolerancia,
                   rotacao: cfg.assinatura_rotacao,
                   recorte: cfg.assinatura_recorte,

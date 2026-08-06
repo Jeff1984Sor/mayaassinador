@@ -9,14 +9,26 @@ quase nunca e #FFFFFF puro.
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
+from typing import Literal
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageChops, UnidentifiedImageError
 
 FORMATOS_ACEITOS = {"PNG", "JPEG", "WEBP"}
 LADO_MAXIMO = 1600  # px — acima disso e desperdicio no PDF
 
 TOLERANCIA_PADRAO = 40
 TOLERANCIA_MAXIMA = 120  # acima disso comeca a comer o traco da assinatura
+
+# "branco": apaga o que esta perto do branco. Rapido e previsivel, mas so
+#   serve para papel claro — fundo cinza ou colorido sobrevive.
+# "auto": descobre a cor do fundo pelas bordas e apaga tudo que se parece com
+#   ela, seja qual for. E o modo para foto de celular, scanner que puxa
+#   cinza e assinatura sobre fundo colorido.
+ModoFundo = Literal["branco", "auto"]
+
+# largura da faixa de borda usada para estimar a cor do fundo, em fracao do
+# lado: 4% pega papel suficiente sem alcancar o traco, que fica no meio
+FAIXA_BORDA = 0.04
 
 
 class ImagemInvalida(Exception):
@@ -35,6 +47,7 @@ class Ajustes:
 
     remover_fundo: bool = True
     tolerancia: int = TOLERANCIA_PADRAO
+    modo_fundo: ModoFundo = "branco"
     # graus no sentido horario; o usuario pensa "girar para a direita"
     rotacao: float = 0.0
     # (x, y, largura, altura) em fracao; None = imagem inteira
@@ -82,6 +95,7 @@ def ajustes_de_dict(dados: dict) -> Ajustes:
     return Ajustes(
         remover_fundo=dados.get("remover_fundo", True),
         tolerancia=dados.get("tolerancia", TOLERANCIA_PADRAO),
+        modo_fundo=dados.get("modo_fundo", "branco"),
         rotacao=dados.get("rotacao", 0),
         recorte=(
             (recorte["x"], recorte["y"], recorte["largura"], recorte["altura"])
@@ -137,6 +151,129 @@ def _remover_fundo(img: Image.Image, tolerancia: int) -> Image.Image:
     return img
 
 
+def _cor_do_fundo(img: Image.Image) -> tuple[int, int, int]:
+    """Estima a cor do fundo pela moldura da imagem.
+
+    A assinatura ocupa o miolo; a borda e papel puro em praticamente todo
+    scan e foto. Usamos a mediana, e nao a media, para que um dedo no canto
+    ou uma sombra forte nao puxem a estimativa.
+    """
+    rgba = img.convert("RGBA")
+    largura, altura = rgba.size
+    faixa_x = max(1, int(largura * FAIXA_BORDA))
+    faixa_y = max(1, int(altura * FAIXA_BORDA))
+
+    bordas = [
+        rgba.crop((0, 0, largura, faixa_y)),  # topo
+        rgba.crop((0, altura - faixa_y, largura, altura)),  # base
+        rgba.crop((0, 0, faixa_x, altura)),  # esquerda
+        rgba.crop((largura - faixa_x, 0, largura, altura)),  # direita
+    ]
+
+    # pixels ja transparentes nao contam: depois de girar, os cantos vazios
+    # sao (0,0,0,0) e puxariam a estimativa para preto
+    pixels = [
+        (p[0], p[1], p[2])
+        for pedaco in bordas
+        for p in pedaco.getdata()
+        if p[3] > 0
+    ]
+    if not pixels:
+        return (255, 255, 255)
+
+    def mediana(canal: int) -> int:
+        valores = sorted(p[canal] for p in pixels)
+        return valores[len(valores) // 2]
+
+    return (mediana(0), mediana(1), mediana(2))
+
+
+def _limiar_otsu(histograma: list[int]) -> int:
+    """Separa 'fundo' de 'traco' no histograma de distancias (metodo de Otsu).
+
+    Em vez de o usuario adivinhar um numero, procuramos o corte que melhor
+    separa os dois grupos de pixels da propria imagem. E o que faz o modo
+    automatico funcionar tanto num scan lavado quanto numa foto escura.
+    """
+    total = sum(histograma)
+    if not total:
+        return 128
+
+    soma_total = sum(i * n for i, n in enumerate(histograma))
+    soma_fundo = 0.0
+    peso_fundo = 0.0
+    melhor_variancia = -1.0
+    melhor_limiar = 128
+
+    for limiar, quantidade in enumerate(histograma):
+        peso_fundo += quantidade
+        if peso_fundo == 0:
+            continue
+        peso_frente = total - peso_fundo
+        if peso_frente == 0:
+            break
+
+        soma_fundo += limiar * quantidade
+        media_fundo = soma_fundo / peso_fundo
+        media_frente = (soma_total - soma_fundo) / peso_frente
+
+        # variancia entre as duas classes: quanto maior, melhor a separacao
+        variancia = peso_fundo * peso_frente * (media_fundo - media_frente) ** 2
+        if variancia > melhor_variancia:
+            melhor_variancia = variancia
+            melhor_limiar = limiar
+
+    return melhor_limiar
+
+
+def _remover_fundo_auto(img: Image.Image, tolerancia: int) -> Image.Image:
+    """Apaga o fundo seja qual for a cor dele — cinza, colorido ou branco.
+
+    Como funciona: descobre a cor do fundo pelas bordas, mede a distancia de
+    cada pixel ate ela e usa Otsu para achar o corte entre fundo e traco.
+    Em torno desse corte a transparencia e gradual, o que preserva a borda
+    suave do traco em vez de deixar o serrilhado de um corte seco.
+
+    Feito com operacoes de banda do Pillow (`ImageChops` e `point`), que
+    rodam em C: um laco por pixel em Python levaria segundos numa imagem de
+    1600px e o worker do prod2 tem um nucleo so.
+    """
+    fundo = _cor_do_fundo(img)
+    rgb = img.convert("RGB")
+
+    # distancia ate a cor do fundo, canal a canal; ficamos com a maior delas,
+    # que e o que separa um cinza neutro de um traco azul de caneta
+    solido = Image.new("RGB", rgb.size, fundo)
+    diferenca = ImageChops.difference(rgb, solido)
+    r, g, b = diferenca.split()
+    distancia = ImageChops.lighter(ImageChops.lighter(r, g), b)
+
+    corte = _limiar_otsu(distancia.histogram())
+
+    # a tolerancia da tela vira a largura da rampa: mais tolerancia, transicao
+    # mais larga e apagando mais perto do traco
+    margem = max(4, int(tolerancia * 0.6))
+    inicio = max(0, corte - margem)
+    fim = min(255, corte + margem)
+
+    def alfa(valor: int) -> int:
+        if valor <= inicio:
+            return 0
+        if valor >= fim:
+            return 255
+        return int(255 * (valor - inicio) / (fim - inicio))
+
+    mascara = distancia.point([alfa(v) for v in range(256)])
+
+    saida = img.convert("RGBA")
+    # o que ja era transparente continua transparente: sem este `darker`, os
+    # cantos vazios deixados pela rotacao voltariam opacos e pretos, porque
+    # preto esta longe da cor do fundo e a rampa os promoveria a traco
+    mascara = ImageChops.darker(mascara, saida.getchannel("A"))
+    saida.putalpha(mascara)
+    return saida
+
+
 def _aparar(img: Image.Image) -> Image.Image:
     """Corta o excesso transparente das bordas.
 
@@ -161,7 +298,12 @@ def processar(conteudo: bytes, destino: Path, ajustes: Ajustes) -> None:
         img = _recortar(img, ajustes.recorte)
     img = _girar(img, ajustes.rotacao)
     if ajustes.remover_fundo:
-        img = _aparar(_remover_fundo(img, ajustes.tolerancia))
+        sem_fundo = (
+            _remover_fundo_auto(img, ajustes.tolerancia)
+            if ajustes.modo_fundo == "auto"
+            else _remover_fundo(img, ajustes.tolerancia)
+        )
+        img = _aparar(sem_fundo)
 
     img.save(destino, format="PNG", optimize=True)
 
