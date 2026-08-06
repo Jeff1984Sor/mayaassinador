@@ -21,6 +21,20 @@ prod2), porque a deploy key do MayaAssinador e diferente da do flicsales.
 Windows (edicao) -> commit + push -> prod2 (`git pull`) -> deploy.
 Nunca editar codigo direto no servidor.
 
+## Servicos (nomes exatos — nao chutar)
+
+| Servico | Unit systemd | Porta |
+|---|---|---|
+| API | `mayaassinador-api` | 8030 |
+| Worker do pipeline | `mayaassinador-worker` | — |
+| Frontend | `mayaassinador-frontend` | 3030 |
+
+O prod2 hospeda outros produtos da casa, com prefixo parecido —
+`mayapost-*` e `mayasec-*`. Um `grep maya` distraido pega servico de outro
+cliente: filtre por `mayaassinador-` inteiro antes de reiniciar qualquer
+coisa. Para achar o processo do nosso frontend entre as varias aplicacoes
+Next do servidor: `pgrep -af "next start -p 3030"`.
+
 ## Deploy do backend
 
 ```bash
@@ -39,9 +53,35 @@ cd ~/mayaassinador && git pull
 cd frontend
 npm install        # so se package.json mudou
 npm run build      # SEMPRE: variaveis NEXT_PUBLIC_* sao embutidas no build
-sudo systemctl restart mayaassinador-frontend
+sudo systemctl restart mayaassinador-frontend   # OBRIGATORIO — ver armadilha abaixo
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3030/escritorio/login
 ```
+
+### Armadilha: build sem restart derruba a tela inteira
+
+Esquecer o `restart` depois do `npm run build` **nao** deixa a versao antiga
+no ar — quebra tudo. Cada build gera nomes com hash novo para o CSS e para
+os chunks de JS; o processo que ficou rodando so conhece o build anterior e
+responde **400 Bad Request** (nao 404) a qualquer estatico que nao esteja no
+manifesto dele. Sem o JS, o React nao hidrata e a pagina mostra
+"Application error: a client-side exception has occurred".
+
+O sintoma engana: parece erro de codigo ou de Tailwind, e o build passa
+limpo. O teste que resolve em um comando — os dois caminhos tem que ser
+iguais e a resposta 200:
+
+```bash
+C=$(curl -s http://127.0.0.1:3030/escritorio/login | grep -o '/_next/static/css/[^"]*' | head -1)
+echo "HTML pede: $C"
+echo "no disco : /_next/static/css/$(ls .next/static/css/ | head -1)"
+curl -s -o /dev/null -w "resposta : %{http_code}\n" "http://127.0.0.1:3030$C"
+```
+
+Depois de corrigir, recarregue com Ctrl+Shift+R: o navegador guarda o HTML
+antigo, que aponta para arquivos que ja nao existem.
+
+O `buildId` nao aparece no HTML das telas (isso e do Pages Router; usamos
+App Router) — nao tente conferir por ali.
 
 ## Logs
 
