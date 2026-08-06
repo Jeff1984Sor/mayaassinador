@@ -54,6 +54,8 @@ export type Configuracao = {
   cabecalho_campos: CabecalhoCampos;
   cabecalho_tipografia: Tipografia;
   logo_posicao: PosicaoLogo;
+  /** alturas em pontos; a largura acompanha a proporcao da imagem */
+  logo_altura: number;
   rodape_campos: CabecalhoCampos;
   rodape_texto: string | null;
   rodape_tipografia: Tipografia;
@@ -62,6 +64,8 @@ export type Configuracao = {
   numeracao_local: "rodape" | "cabecalho";
   rubricar_por_padrao: boolean;
   qrcode_ativo: boolean;
+  rubrica_altura: number;
+  assinatura_altura: number;
   assinatura_modo: "fixa" | "ancora";
   assinatura_ancora: string | null;
   assinatura_relativa: "acima" | "abaixo";

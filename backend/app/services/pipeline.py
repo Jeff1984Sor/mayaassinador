@@ -161,6 +161,8 @@ def processar(db: Session, documento: Documento) -> None:
             url_verificacao=url_verificacao,
             codigo=formatar_codigo(codigo) if config.qrcode_ativo else None,
             posicao=posicao,
+            rubrica_altura=config.rubrica_altura or pdf_carimbo.RUBRICA_ALTURA,
+            assinatura_altura=config.assinatura_altura or pdf_carimbo.ASSINATURA_ALTURA,
         )
     except pdf_carimbo.FalhaCarimbo as exc:
         raise FalhaPipeline(str(exc)) from exc

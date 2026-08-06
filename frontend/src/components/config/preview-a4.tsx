@@ -114,7 +114,9 @@ function Cabecalho({
     <img
       src={logoSrc!}
       alt=""
-      style={{ maxHeight: 46, maxWidth: 120, objectFit: "contain" }}
+      // a altura vem da configuracao, igual ao `add_picture` do docx_timbre;
+      // a largura fica livre para a imagem manter a propria proporcao
+      style={{ height: config.logo_altura, maxWidth: "100%", objectFit: "contain" }}
     />
   ) : null;
 

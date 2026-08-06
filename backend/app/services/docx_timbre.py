@@ -194,6 +194,8 @@ def aplicar(
     posicao_logo = config.logo_posicao or "esquerda"
     usar_logo = logo is not None and logo.exists() and posicao_logo != "sem_logo"
 
+    altura_logo = Pt(config.logo_altura or 34)
+
     numerar = bool(config.rodape_numeracao)
     lado_num = config.rodape_numeracao_alinhamento or "direita"
     numerar_no_cabecalho = numerar and (config.numeracao_local or "rodape") == "cabecalho"
@@ -223,7 +225,7 @@ def aplicar(
 
             p_logo = celula_logo.paragraphs[0]
             p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_logo.add_run().add_picture(str(logo), height=Pt(34))
+            p_logo.add_run().add_picture(str(logo), height=altura_logo)
 
             primeiro = True
             alvo = celula_texto.paragraphs[0]
@@ -236,7 +238,7 @@ def aplicar(
             if usar_logo and posicao_logo in ("acima", "centro"):
                 p = cabecalho.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p.add_run().add_picture(str(logo), height=Pt(34))
+                p.add_run().add_picture(str(logo), height=altura_logo)
 
             # em "centro" o texto acompanha o logo, ignorando o alinhamento
             # escolhido na tipografia — e o que faz o bloco parecer timbrado

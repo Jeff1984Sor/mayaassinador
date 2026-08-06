@@ -128,6 +128,8 @@ def gerar(config: ConfiguracaoTenant, escritorio: Escritorio | None, slug: str) 
             relativa=config.assinatura_relativa or "abaixo",
             deslocamento=config.assinatura_deslocamento or 6,
         ),
+        rubrica_altura=config.rubrica_altura or pdf_carimbo.RUBRICA_ALTURA,
+        assinatura_altura=config.assinatura_altura or pdf_carimbo.ASSINATURA_ALTURA,
     )
 
     for temporario in (exemplo, timbrado, convertido):

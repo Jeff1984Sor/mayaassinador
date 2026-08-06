@@ -76,6 +76,7 @@ class ConfiguracaoUpdate(BaseModel):
     cabecalho_campos: CabecalhoCampos
     cabecalho_tipografia: Tipografia
     logo_posicao: PosicaoLogo = "esquerda"
+    logo_altura: int = Field(default=34, ge=10, le=120)
 
     rodape_campos: RodapeCampos = RodapeCampos()
     rodape_texto: str | None = Field(default=None, max_length=2000)
@@ -86,6 +87,11 @@ class ConfiguracaoUpdate(BaseModel):
 
     rubricar_por_padrao: bool = False
     qrcode_ativo: bool = True
+
+    # ---- Tamanho dos carimbos, em pontos ----
+    # Os tetos existem para que uma imagem enorme nao cubra o texto da peca.
+    rubrica_altura: int = Field(default=26, ge=10, le=80)
+    assinatura_altura: int = Field(default=84, ge=20, le=200)
 
     # ---- Posicao da assinatura ----
     assinatura_modo: Literal["fixa", "ancora"] = "fixa"
@@ -112,6 +118,7 @@ class ConfiguracaoOut(BaseModel):
     cabecalho_campos: CabecalhoCampos
     cabecalho_tipografia: Tipografia
     logo_posicao: PosicaoLogo
+    logo_altura: int
 
     rodape_campos: RodapeCampos
     rodape_texto: str | None
@@ -122,6 +129,8 @@ class ConfiguracaoOut(BaseModel):
 
     rubricar_por_padrao: bool
     qrcode_ativo: bool
+    rubrica_altura: int
+    assinatura_altura: int
     assinatura_modo: Literal["fixa", "ancora"]
     assinatura_ancora: str | None
     assinatura_relativa: Literal["acima", "abaixo"]

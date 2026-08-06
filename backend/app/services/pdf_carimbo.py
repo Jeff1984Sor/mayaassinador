@@ -18,11 +18,18 @@ from app.services import ancora_pdf
 
 # medidas em pontos (1pt = 1/72")
 MARGEM = 28
-RUBRICA_ALTURA = 26
-RUBRICA_LARGURA_MAX = 90
-ASSINATURA_ALTURA = 84
-ASSINATURA_LARGURA_MAX = 290
 QR_LADO = 42
+
+# Alturas padrao, usadas quando o tenant nao configurou nada. Sao os valores
+# que antes estavam fixos aqui — quem ja tem documentos gerados nao ve o
+# carimbo mudar de tamanho sozinho.
+RUBRICA_ALTURA = 26
+ASSINATURA_ALTURA = 84
+
+# A largura maxima acompanha a altura escolhida em vez de ser um numero fixo:
+# se o teto nao crescesse junto, aumentar a altura de uma assinatura larga nao
+# teria efeito nenhum — a escala continuaria travada pela largura.
+RAZAO_LARGURA_MAX = 3.45
 
 
 class FalhaCarimbo(Exception):
@@ -30,8 +37,11 @@ class FalhaCarimbo(Exception):
 
 
 def _dimensoes_proporcionais(
-    caminho: Path, altura_alvo: float, largura_max: float
+    caminho: Path, altura_alvo: float, largura_max: float | None = None
 ) -> tuple[float, float]:
+    """Escala a imagem para `altura_alvo` sem distorcer, respeitando o teto."""
+    if largura_max is None:
+        largura_max = altura_alvo * RAZAO_LARGURA_MAX
     imagem = ImageReader(str(caminho))
     largura, altura = imagem.getSize()
     escala = altura_alvo / altura
@@ -133,12 +143,14 @@ def _overlay(
     qr_buffer: BytesIO | None,
     codigo: str | None,
     coordenada_assinatura: tuple[float, float] | None = None,
+    rubrica_altura: int = RUBRICA_ALTURA,
+    assinatura_altura: int = ASSINATURA_ALTURA,
 ) -> BytesIO:
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(largura, altura))
 
     if rubrica:
-        w, h = _dimensoes_proporcionais(rubrica, RUBRICA_ALTURA, RUBRICA_LARGURA_MAX)
+        w, h = _dimensoes_proporcionais(rubrica, rubrica_altura)
         c.drawImage(
             ImageReader(str(rubrica)),
             largura - MARGEM - w,
@@ -149,9 +161,7 @@ def _overlay(
         )
 
     if assinatura:
-        w, h = _dimensoes_proporcionais(
-            assinatura, ASSINATURA_ALTURA, ASSINATURA_LARGURA_MAX
-        )
+        w, h = _dimensoes_proporcionais(assinatura, assinatura_altura)
         x, y = coordenada_assinatura or ((largura - w) / 2, MARGEM + 46)
         c.drawImage(
             ImageReader(str(assinatura)), x, y, width=w, height=h, mask="auto"
@@ -180,6 +190,8 @@ def carimbar(
     url_verificacao: str | None,
     codigo: str | None,
     posicao: PosicaoAssinatura | None = None,
+    rubrica_altura: int = RUBRICA_ALTURA,
+    assinatura_altura: int = ASSINATURA_ALTURA,
 ) -> tuple[int, bool]:
     """Aplica os carimbos e devolve (numero de paginas, assinatura ancorada).
 
@@ -207,9 +219,7 @@ def carimbar(
     # A busca da ancora acontece ANTES de qualquer merge: depois o overlay
     # ja teria alterado o conteudo de texto das paginas.
     if assinatura:
-        w, h = _dimensoes_proporcionais(
-            assinatura, ASSINATURA_ALTURA, ASSINATURA_LARGURA_MAX
-        )
+        w, h = _dimensoes_proporcionais(assinatura, assinatura_altura)
         indice_assinatura, coordenada, ancorou = _localizar_pagina_assinatura(
             leitor, posicao, w, h
         )
@@ -237,6 +247,8 @@ def carimbar(
                 qr_buffer if ultima else None,
                 codigo if ultima else None,
                 coordenada if assina_aqui else None,
+                rubrica_altura,
+                assinatura_altura,
             )
             pagina.merge_page(PdfReader(camada).pages[0])
 

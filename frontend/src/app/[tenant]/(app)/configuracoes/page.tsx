@@ -6,7 +6,13 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { AreaTexto, Campo, EditorTipografia, Marcador } from "@/components/config/campos";
+import {
+  AreaTexto,
+  Campo,
+  EditorTipografia,
+  Marcador,
+  Tamanho,
+} from "@/components/config/campos";
 import { PreviewA4 } from "@/components/config/preview-a4";
 import { UploadImagem } from "@/components/config/upload-imagem";
 import { api, mensagemErro } from "@/lib/api";
@@ -178,6 +184,7 @@ export default function ConfiguracoesPage() {
         cabecalho_campos: cfg.cabecalho_campos,
         cabecalho_tipografia: cfg.cabecalho_tipografia,
         logo_posicao: cfg.logo_posicao,
+        logo_altura: cfg.logo_altura,
         rodape_campos: cfg.rodape_campos,
         rodape_texto: cfg.rodape_texto,
         rodape_tipografia: cfg.rodape_tipografia,
@@ -186,6 +193,8 @@ export default function ConfiguracoesPage() {
         numeracao_local: cfg.numeracao_local,
         rubricar_por_padrao: cfg.rubricar_por_padrao,
         qrcode_ativo: cfg.qrcode_ativo,
+        rubrica_altura: cfg.rubrica_altura,
+        assinatura_altura: cfg.assinatura_altura,
         assinatura_modo: cfg.assinatura_modo,
         assinatura_ancora: cfg.assinatura_ancora,
         assinatura_relativa: cfg.assinatura_relativa,
@@ -480,6 +489,18 @@ export default function ConfiguracoesPage() {
                 </select>
               </div>
 
+              {cfg.logo_posicao !== "sem_logo" && (
+                <Tamanho
+                  rotulo="Tamanho do logo"
+                  descricao="Altura no cabecalho. A largura acompanha, mantendo a proporcao da imagem."
+                  valor={cfg.logo_altura}
+                  onChange={(v) => setConfig("logo_altura", v)}
+                  min={10}
+                  max={120}
+                  padrao={34}
+                />
+              )}
+
               <EditorTipografia
                 titulo="Tipografia do cabecalho"
                 valor={cfg.cabecalho_tipografia}
@@ -591,6 +612,16 @@ export default function ConfiguracoesPage() {
                 onMudou={recarregarImagens}
               />
 
+              <Tamanho
+                rotulo="Tamanho da rubrica"
+                descricao="Altura do carimbo no canto inferior direito das paginas."
+                valor={cfg.rubrica_altura}
+                onChange={(v) => setConfig("rubrica_altura", v)}
+                min={10}
+                max={80}
+                padrao={26}
+              />
+
               <Marcador
                 rotulo="Rubricar por padrao"
                 descricao="Valor inicial do toggle na hora do upload."
@@ -611,6 +642,16 @@ export default function ConfiguracoesPage() {
                 urlOriginal={urlArquivo(cfg.assinatura_original_url)}
                 endpoint={`/api/${tenant}/configuracoes/imagens/assinatura`}
                 onMudou={recarregarImagens}
+              />
+
+              <Tamanho
+                rotulo="Tamanho da assinatura"
+                descricao="Altura da assinatura na pagina do fecho."
+                valor={cfg.assinatura_altura}
+                onChange={(v) => setConfig("assinatura_altura", v)}
+                min={20}
+                max={200}
+                padrao={84}
               />
 
               <p className="rounded-lg bg-teal/10 px-3 py-2 text-xs text-teal">

@@ -37,6 +37,73 @@ export function Campo({
   );
 }
 
+/** Controle de tamanho em pontos: arraste para ajustar, digite para precisar.
+ *
+ * O valor viaja em pontos porque e a unidade do PDF e do Word, mas ninguem
+ * pensa em pontos — por isso mostramos o equivalente em milimetros ao lado.
+ */
+export function Tamanho({
+  rotulo,
+  descricao,
+  valor,
+  onChange,
+  min,
+  max,
+  padrao,
+}: {
+  rotulo: string;
+  descricao?: string;
+  valor: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  padrao: number;
+}) {
+  // preso na faixa: o backend rejeita fora dela e o usuario perderia o salvamento
+  const limitar = (v: number) => Math.min(max, Math.max(min, Math.round(v) || min));
+  const mm = (valor / 72) * 25.4;
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <label className="rotulo">{rotulo}</label>
+        <button
+          type="button"
+          className="text-xs text-indigo hover:underline disabled:opacity-40 disabled:no-underline"
+          disabled={valor === padrao}
+          onClick={() => onChange(padrao)}
+        >
+          Restaurar padrao
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          type="range"
+          className="h-1.5 flex-1 cursor-pointer accent-indigo"
+          min={min}
+          max={max}
+          value={valor}
+          onChange={(e) => onChange(limitar(Number(e.target.value)))}
+        />
+        <input
+          type="number"
+          className="campo w-20 shrink-0 text-center"
+          min={min}
+          max={max}
+          value={valor}
+          onChange={(e) => onChange(limitar(Number(e.target.value)))}
+        />
+        <span className="w-16 shrink-0 text-xs text-dark/65">
+          pt · {mm.toFixed(1)}mm
+        </span>
+      </div>
+
+      {descricao && <p className="mt-1 text-xs text-dark/65">{descricao}</p>}
+    </div>
+  );
+}
+
 export function AreaTexto({
   rotulo,
   valor,
